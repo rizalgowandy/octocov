@@ -1,13 +1,15 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/k1LoW/octocov/internal"
+	"github.com/google/go-cmp/cmp"
+	"golang.org/x/text/language"
 )
 
 func TestMain(m *testing.M) {
@@ -16,7 +18,8 @@ func TestMain(m *testing.M) {
 	m.Run()
 
 	if err := revertEnv(envCache); err != nil {
-		panic(err)
+		_, _ = fmt.Fprint(os.Stderr, err) //nostyle:handlerrors
+		os.Exit(1)
 	}
 }
 
@@ -26,10 +29,10 @@ func TestLoad(t *testing.T) {
 		path    string
 		wantErr bool
 	}{
-		{testdataDir(t), "", false},
-		{filepath.Join(testdataDir(t), "config"), "", false},
-		{filepath.Join(testdataDir(t), "config"), ".octocov.yml", false},
-		{filepath.Join(testdataDir(t), "config"), "no.yml", true},
+		{rootTestdataDir(t), "", false},
+		{filepath.Join(rootTestdataDir(t), "config"), "", false},
+		{filepath.Join(rootTestdataDir(t), "config"), ".octocov.yml", false},
+		{filepath.Join(rootTestdataDir(t), "config"), "no.yml", true},
 	}
 	for _, tt := range tests {
 		c := New()
@@ -46,16 +49,111 @@ func TestLoad(t *testing.T) {
 	}
 }
 
-func TestLoadConfigAndOmitEnableFlag(t *testing.T) {
-	wd := filepath.Join(testdataDir(t), "config")
-	p := ".octocov.yml"
-	c := New()
-	c.wd = wd
-	if err := c.Load(p); err != nil {
-		t.Fatal(err)
+func TestLoadComment(t *testing.T) {
+	tests := []struct {
+		path string
+		want *Comment
+	}{
+		{"comment_enabled_octocov.yml", &Comment{}},
+		{"comment_enabled_octocov2.yml", &Comment{If: "is_pull_request"}},
+		{"comment_disabled_octocov.yml", nil},
 	}
-	if !internal.IsEnable(c.Comment.Enable) {
-		t.Errorf("got %v\nwant true", *c.Comment.Enable)
+	for _, tt := range tests {
+		c := New()
+		p := filepath.Join(testdataDir(t), tt.path)
+		if err := c.Load(p); err != nil {
+			t.Fatal(err)
+		}
+		got := c.Comment
+		if diff := cmp.Diff(got, tt.want, nil); diff != "" {
+			t.Error(diff)
+		}
+	}
+}
+
+func TestLoadCentralPush(t *testing.T) {
+	tests := []struct {
+		path string
+		want *Push
+	}{
+		{"central_push_enabled_octocov.yml", &Push{}},
+		{"central_push_enabled_octocov2.yml", &Push{If: "is_default_branch"}},
+		{"central_push_disabled_octocov.yml", nil},
+	}
+	for _, tt := range tests {
+		c := New()
+		p := filepath.Join(testdataDir(t), tt.path)
+		if err := c.Load(p); err != nil {
+			t.Fatal(err)
+		}
+		got := c.Central.Push
+		if diff := cmp.Diff(got, tt.want, nil); diff != "" {
+			t.Error(diff)
+		}
+	}
+}
+
+func TestLoadLocale(t *testing.T) {
+	tests := []struct {
+		path      string
+		want      *language.Tag
+		wantError bool
+	}{
+		{"locale_nothing.yml", nil, false},
+		{"locale_empty.yml", nil, false},
+		{"locale_ja.yml", &language.Japanese, false},
+		{"locale_ja_uppercase.yml", &language.Japanese, false},
+		{"locale_fr.yml", &language.French, false},
+		{"locale_unkown.yml", nil, true},
+	}
+	for _, tt := range tests {
+		c := New()
+		t.Run(fmt.Sprintf("%v", tt.path), func(t *testing.T) {
+			p := filepath.Join(testdataDir(t), tt.path)
+			if err := c.Load(p); err != nil {
+				if tt.wantError {
+					return
+				}
+				t.Fatal(err)
+			}
+			got := c.Locale
+			if tt.want == nil && got == nil {
+				return
+			}
+			if diff := cmp.Diff(got.String(), tt.want.String(), nil); diff != "" {
+				t.Error(diff)
+			}
+		})
+	}
+}
+
+func TestCoveragePaths(t *testing.T) {
+	tests := []struct {
+		paths      []string
+		configPath string
+		want       []string
+	}{
+		{[]string{"a/b/coverage.out"}, "path/to/.octocov.yml", []string{"path/to/a/b/coverage.out"}},
+		{[]string{}, "path/to/.octocov.yml", []string{"path/to"}},
+		{[]string{"a/b/coverage.out"}, ".octocov.yml", []string{"a/b/coverage.out"}},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%v", tt.paths), func(t *testing.T) {
+			c := New()
+			c.path = filepath.FromSlash(tt.configPath)
+			c.Coverage = &Coverage{
+				Paths: tt.paths,
+			}
+			c.Build()
+			got := c.Coverage.Paths
+			var want []string
+			for _, p := range tt.want {
+				want = append(want, filepath.FromSlash(p))
+			}
+			if diff := cmp.Diff(got, want, nil); diff != "" {
+				t.Error(diff)
+			}
+		})
 	}
 }
 
@@ -65,29 +163,38 @@ func TestCoverageAcceptable(t *testing.T) {
 		cov     float64
 		prev    float64
 		wantErr bool
+		errMsg  string
 	}{
-		{"60%", 50.0, 0, true},
-		{"50%", 50.0, 0, false},
-		{"49.9%", 50.0, 0, false},
-		{"49.9", 50.0, 0, false},
-		{">= 60%", 50.0, 0, true},
-		{">= 50%", 50.0, 0, false},
-		{">= 49.9%", 50.0, 0, false},
-		{">= 49.9", 50.0, 0, false},
-		{">=60%", 50.0, 0, true},
-		{">=50%", 50.0, 0, false},
-		{">=49.9%", 50.0, 0, false},
-		{">=49.9", 50.0, 0, false},
+		{"60%", 50.0, 0, true, "code coverage is 50.0%. the condition in the `coverage.acceptable:` section is not met (`60%`)"},
+		{"50%", 50.0, 0, false, ""},
+		{"49.9%", 50.0, 0, false, ""},
+		{"49.9", 50.0, 0, false, ""},
+		{">= 60%", 50.0, 0, true, "code coverage is 50.0%. the condition in the `coverage.acceptable:` section is not met (`>= 60%`)"},
+		{">= 50%", 50.0, 0, false, ""},
+		{">= 49.9%", 50.0, 0, false, ""},
+		{">= 49.9", 50.0, 0, false, ""},
+		{">= 49.9%", 49.9, 0, false, ""},
+		{">= 49.9", 49.9, 0, false, ""},
+		{"> 49.9", 49.9, 0, true, "code coverage is 49.9%. the condition in the `coverage.acceptable:` section is not met (`> 49.9`)"},
+		{">=60%", 50.0, 0, true, "code coverage is 50.0%. the condition in the `coverage.acceptable:` section is not met (`>=60%`)"},
+		{">=50%", 50.0, 0, false, ""},
+		{">=49.9%", 50.0, 0, false, ""},
+		{">=49.9", 50.0, 0, false, ""},
 
-		{"current >= 60%", 50.0, 0, true},
-		{"current > prev", 50.0, 49.0, false},
-		{"diff >= 0", 50.0, 49.0, false},
-		{"current >= 50% && diff >= 0%", 50.0, 49.0, false},
+		{"current >= 60%", 50.0, 0, true, "code coverage is 50.0%. the condition in the `coverage.acceptable:` section is not met (`current >= 60%`)"},
+		{"current >= 60%", 59.9, 0, true, "code coverage is 59.9%. the condition in the `coverage.acceptable:` section is not met (`current >= 60%`)"},
+		{"current >= 60%", 59.99, 0, true, "code coverage is 59.9%. the condition in the `coverage.acceptable:` section is not met (`current >= 60%`)"},
+		{"current > prev", 50.0, 49.0, false, ""},
+		{"diff >= 0", 50.0, 49.0, false, ""},
+		{"current >= 50% && diff >= 0%", 50.0, 49.0, false, ""},
 	}
 	for _, tt := range tests {
 		if err := coverageAcceptable(tt.cov, tt.prev, tt.cond); err != nil {
 			if !tt.wantErr {
 				t.Errorf("got %v\nwantErr %v", err, tt.wantErr)
+			}
+			if err.Error() != tt.errMsg {
+				t.Errorf("got %v\nwant %v", err.Error(), tt.errMsg)
 			}
 		} else {
 			if tt.wantErr {
@@ -201,7 +308,7 @@ func clearEnv() error {
 	return nil
 }
 
-func testdataDir(t *testing.T) string {
+func rootTestdataDir(t *testing.T) string {
 	t.Helper()
 	wd, err := os.Getwd()
 	if err != nil {
