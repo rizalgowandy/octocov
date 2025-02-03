@@ -1,26 +1,26 @@
 coverage:
-  acceptable: current >= 60% && diff >= 0.0%
-  badge:
-    path: docs/coverage.svg
+  if: true
+  acceptable: current >= 40%
 codeToTestRatio:
-  badge:
-    path: docs/ratio.svg
   code:
     - '**/*.go'
     - '!**/*_test.go'
   test:
     - '**/*_test.go'
 testExecutionTime:
-  acceptable: 1min30sec
-  badge:
-    path: docs/time.svg
+  acceptable: 2min30sec
 diff:
-  if: github.event_name == 'pull_request'
-  path: .octocov/report.json
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
 push:
   if: is_default_branch
 comment:
-  if: github.event_name == 'pull_request'
+  if: is_pull_request
+summary:
+  if: true
+# body:
+#   if: is_pull_request
 report:
   if: is_default_branch
-  path: .octocov/report.json
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}

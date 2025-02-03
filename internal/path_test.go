@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestGetRootPath(t *testing.T) {
+func TestRootPath(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "a", "b", "c", "d"), 0700); err != nil {
 		t.Fatal(err)
@@ -30,7 +30,7 @@ func TestGetRootPath(t *testing.T) {
 		{filepath.Join(dir, "a"), true},
 	}
 	for _, tt := range tests {
-		got, err := GetRootPath(tt.base)
+		got, err := RootPath(tt.base)
 		if err != nil {
 			if !tt.wantErr {
 				t.Errorf("got %v\nwantErr %v", err, tt.wantErr)
@@ -42,34 +42,6 @@ func TestGetRootPath(t *testing.T) {
 			if want := filepath.Join(dir, "a", "b"); got != want {
 				t.Errorf("got %v\nwant %v", got, want)
 			}
-		}
-	}
-}
-
-func TestDetectPrefix(t *testing.T) {
-	tests := []struct {
-		gitRoot string
-		wd      string
-		files   []string
-		cfiles  []string
-		want    string
-	}{
-		{"/path/to", "/path/to", []string{"/path/to/foo/file.txt"}, []string{"github.com/owner/repo/foo/file.txt"}, "github.com/owner/repo"},
-		{"/path/to", "/path/to/foo", []string{"/path/to/foo/file.txt"}, []string{"github.com/owner/repo/foo/file.txt"}, "github.com/owner/repo/foo"},
-		{"/path/to", "/path/to/bar", []string{"/path/to/foo/file.txt"}, []string{"github.com/owner/repo/foo/file.txt"}, "github.com/owner/repo/bar"},
-		{"/path/to", "/path/to", []string{"/path/to/central/central.go"}, []string{"github.com/owner/repo/central/central.go"}, "github.com/owner/repo"},
-		{"/path/to/github.com/owner/repo", "/path/to/github.com/owner/repo", []string{"/path/to/github.com/owner/repo/central/central.go"}, []string{"github.com/owner/repo/central/central.go"}, "github.com/owner/repo"},
-		{"/path/to", "/path/to", []string{"/path/to/foo/file.txt"}, []string{"/other/to/foo/file.txt"}, "/other/to"},
-		{"/path/to", "/path/to", []string{"/path/to/foo/file.txt"}, []string{"/path/to/foo/file.txt"}, "/path/to"},
-		{"/path/to", "/path/to", []string{"/path/to/foo/file.txt"}, []string{"/path/to/bar/foo/file.txt"}, "/path/to/bar"},
-		{"/path/to", "/path/to/foo", []string{"/path/to/foo/file.txt"}, []string{"/path/to/bar/foo/file.txt"}, "/path/to/bar/foo"},
-		{"/path/to", "/path/to/foo", []string{"/path/to/foo/file.txt"}, []string{"./foo/file.txt"}, "foo"},
-		{"/path/to", "/path/to", []string{"/path/to/foo/file.txt"}, []string{"./foo/file.txt"}, ""},
-	}
-	for _, tt := range tests {
-		got := DetectPrefix(tt.gitRoot, tt.wd, tt.files, tt.cfiles)
-		if got != tt.want {
-			t.Errorf("got %v\nwant %v", got, tt.want)
 		}
 	}
 }

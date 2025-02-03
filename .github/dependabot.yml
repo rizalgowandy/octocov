@@ -1,0 +1,43 @@
+version: 2
+updates:
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    schedule:
+      interval: "weekly"
+      time: "08:00"
+      timezone: "Asia/Tokyo"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    open-pull-requests-limit: 10
+    assignees:
+      - "k1LoW"
+
+  - package-ecosystem: "gomod"
+    directory: "/"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    schedule:
+      interval: "weekly"
+      time: "08:00"
+      timezone: "Asia/Tokyo"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    ignore:
+      - dependency-name: "github.com/migueleliasweb/go-github-mock"
+        versions: ["1.1.x"]
+      - dependency-name: "github.com/goark/gnkf"
+        versions: ["0.x.x"]
+      - dependency-name: "github.com/hhatto/gocloc"
+        versions: ["0.x.x"]
+    open-pull-requests-limit: 10
+    assignees:
+      - "k1LoW"

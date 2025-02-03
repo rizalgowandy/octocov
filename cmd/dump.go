@@ -32,7 +32,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// dumpCmd represents the dump command
+// dumpCmd represents the dump command.
 var dumpCmd = &cobra.Command{
 	Use:   "dump",
 	Short: "dump report",
@@ -59,7 +59,7 @@ var dumpCmd = &cobra.Command{
 		if err := c.CoverageConfigReady(); err != nil {
 			cmd.PrintErrf("Skip measuring code coverage: %v\n", err)
 		} else {
-			if err := r.MeasureCoverage(c.Coverage.Paths); err != nil {
+			if err := r.MeasureCoverage(c.Coverage.Paths, c.Coverage.Exclude); err != nil {
 				cmd.PrintErrf("Skip measuring code coverage: %v\n", err)
 			}
 		}
@@ -75,7 +75,7 @@ var dumpCmd = &cobra.Command{
 		if err := c.TestExecutionTimeConfigReady(); err != nil {
 			cmd.PrintErrf("Skip measuring test execution time: %v\n", err)
 		} else {
-			stepNames := []string{}
+			var stepNames []string
 			if len(c.TestExecutionTime.Steps) > 0 {
 				stepNames = c.TestExecutionTime.Steps
 			}
@@ -84,12 +84,16 @@ var dumpCmd = &cobra.Command{
 			}
 		}
 
+		if err := r.CollectCustomMetrics(); err != nil {
+			cmd.PrintErrf("Skip collecting custom metrics: %v\n", err)
+		}
+
 		if r.CountMeasured() == 0 {
 			return errors.New("nothing could be measured")
 		}
 
 		if err := r.Validate(); err != nil {
-			return fmt.Errorf("validation error: %w\n", err)
+			return fmt.Errorf("validation error: %w", err)
 		}
 		cmd.Println(r.String())
 		return nil
@@ -98,5 +102,6 @@ var dumpCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(dumpCmd)
+	dumpCmd.Flags().StringVarP(&configPath, "config", "", "", "config file path")
 	dumpCmd.Flags().StringVarP(&reportPath, "report", "r", "", "coverage report file path")
 }
