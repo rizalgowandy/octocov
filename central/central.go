@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -15,11 +16,11 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/k1LoW/octocov/badge"
 	"github.com/k1LoW/octocov/datastore"
 	"github.com/k1LoW/octocov/datastore/local"
 	"github.com/k1LoW/octocov/gh"
 	"github.com/k1LoW/octocov/internal"
-	"github.com/k1LoW/octocov/pkg/badge"
 	"github.com/k1LoW/octocov/report"
 )
 
@@ -27,11 +28,11 @@ import (
 var indexTmpl []byte
 
 type Central struct {
-	config  *CentralConfig
+	config  *Config
 	reports []*report.Report
 }
 
-type CentralConfig struct {
+type Config struct {
 	Repository             string
 	Wd                     string
 	Index                  string
@@ -42,7 +43,7 @@ type CentralConfig struct {
 	TestExecutionTimeColor func(d time.Duration) string
 }
 
-func New(c *CentralConfig) *Central {
+func New(c *Config) *Central {
 	return &Central{
 		config: c,
 	}
@@ -78,6 +79,10 @@ func (c *Central) Generate(ctx context.Context) ([]string, error) {
 	return paths, nil
 }
 
+func (c *Central) CollectedReports() []*report.Report {
+	return c.reports
+}
+
 func (c *Central) collectReports() error {
 	rsMap := map[string]*report.Report{}
 
@@ -109,7 +114,9 @@ func (c *Central) collectReports() error {
 			}
 			current, ok := rsMap[r.Repository]
 			if !ok {
-				_, _ = fmt.Fprintf(os.Stderr, "Collect report of %s\n", r.Repository)
+				if _, err := fmt.Fprintf(os.Stderr, "Collect report of %s\n", r.Repository); err != nil {
+					return err
+				}
 				rsMap[r.Repository] = r
 				return nil
 			}
@@ -136,7 +143,7 @@ func (c *Central) generateBadges() ([]string, error) {
 		cp := r.CoveragePercent()
 		bp := filepath.Join(r.Repository, "coverage.svg")
 		out := new(bytes.Buffer)
-		b := badge.New("coverage", fmt.Sprintf("%.1f%%", cp))
+		b := badge.New("coverage", fmt.Sprintf("%.1f%%", floor1(cp)))
 		b.MessageColor = c.config.CoverageColor(cp)
 		if err := b.AddIcon(internal.Icon); err != nil {
 			return nil, err
@@ -151,7 +158,7 @@ func (c *Central) generateBadges() ([]string, error) {
 			tr := r.CodeToTestRatioRatio()
 			bp := filepath.Join(r.Repository, "ratio.svg")
 			out := new(bytes.Buffer)
-			b := badge.New("code to test ratio", fmt.Sprintf("1:%.1f", tr))
+			b := badge.New("code to test ratio", fmt.Sprintf("1:%.1f", floor1(tr)))
 			b.MessageColor = c.config.CodeToTestRatioColor(tr)
 			if err := b.AddIcon(internal.Icon); err != nil {
 				return nil, err
@@ -178,7 +185,7 @@ func (c *Central) generateBadges() ([]string, error) {
 			badges[bp] = out.Bytes()
 		}
 	}
-	generatedPaths := []string{}
+	var generatedPaths []string
 	for _, d := range c.config.Badges {
 		for path, content := range badges {
 			if err := d.Put(ctx, path, content); err != nil {
@@ -209,9 +216,26 @@ func (c *Central) renderIndex(wr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	rawRootURL, err := g.GetRawRootURL(ctx, repo.Owner, repo.Repo)
+	isPrivate, err := g.IsPrivate(ctx, repo.Owner, repo.Repo)
 	if err != nil {
 		return err
+	}
+	var (
+		rootURL string
+		query   string
+	)
+	if !isPrivate {
+		rootURL, err = g.FetchRawRootURL(ctx, repo.Owner, repo.Repo)
+		if err != nil {
+			return err
+		}
+	} else {
+		b, err := g.FetchDefaultBranch(ctx, repo.Owner, repo.Repo)
+		if err != nil {
+			return err
+		}
+		rootURL = fmt.Sprintf("%s/%s/%s/blob/%s", host, repo.Owner, repo.Repo, b)
+		query = "?raw=true"
 	}
 
 	// Get project root dir
@@ -240,12 +264,14 @@ func (c *Central) renderIndex(wr io.Writer) error {
 		return err
 	}
 
-	d := map[string]interface{}{
+	d := map[string]any{
 		"Host":          host,
 		"Reports":       c.reports,
-		"BadgesLinkRel": badgesLinkRel,
-		"BadgesURLRel":  badgesURLRel,
-		"RawRootURL":    rawRootURL,
+		"BadgesLinkRel": filepath.ToSlash(badgesLinkRel),
+		"BadgesURLRel":  filepath.ToSlash(badgesURLRel),
+		"RootURL":       rootURL,
+		"IsPrivate":     isPrivate,
+		"Query":         query,
 	}
 	if err := tmpl.Execute(wr, d); err != nil {
 		return err
@@ -254,16 +280,16 @@ func (c *Central) renderIndex(wr io.Writer) error {
 	return nil
 }
 
-func funcs() map[string]interface{} {
+func funcs() map[string]any {
 	return template.FuncMap{
 		"coverage": func(r *report.Report) string {
-			return fmt.Sprintf("%.1f%%", r.CoveragePercent())
+			return fmt.Sprintf("%.1f%%", floor1(r.CoveragePercent()))
 		},
 		"ratio": func(r *report.Report) string {
 			if r.CodeToTestRatio == nil {
 				return "-"
 			}
-			return fmt.Sprintf("1:%.1f", r.CodeToTestRatioRatio())
+			return fmt.Sprintf("1:%.1f", floor1(r.CodeToTestRatioRatio()))
 		},
 		"time": func(r *report.Report) string {
 			if r.TestExecutionTime == nil {
@@ -272,4 +298,9 @@ func funcs() map[string]interface{} {
 			return time.Duration(r.TestExecutionTimeNano()).String()
 		},
 	}
+}
+
+// floor1 round down to one decimal place.
+func floor1(v float64) float64 {
+	return math.Floor(v*10) / 10
 }

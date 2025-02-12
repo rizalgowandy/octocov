@@ -9,7 +9,6 @@ import (
 	"github.com/k1LoW/octocov/config"
 	"github.com/k1LoW/octocov/datastore"
 	"github.com/k1LoW/octocov/datastore/local"
-	"github.com/k1LoW/octocov/internal"
 )
 
 func TestCollectReports(t *testing.T) {
@@ -22,10 +21,10 @@ func TestCollectReports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctr := New(&CentralConfig{
+	ctr := New(&Config{
 		Repository:             "owner/repo",
 		Index:                  ".",
-		Wd:                     c.Getwd(),
+		Wd:                     c.Wd(),
 		Badges:                 []datastore.Datastore{bd},
 		Reports:                []datastore.Datastore{rd},
 		CoverageColor:          c.CoverageColor,
@@ -54,10 +53,10 @@ func TestGenerateBadges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctr := New(&CentralConfig{
+	ctr := New(&Config{
 		Repository:             "owner/repo",
 		Index:                  ".",
-		Wd:                     c.Getwd(),
+		Wd:                     c.Wd(),
 		Badges:                 []datastore.Datastore{bd},
 		Reports:                []datastore.Datastore{rd},
 		CoverageColor:          c.CoverageColor,
@@ -76,7 +75,7 @@ func TestGenerateBadges(t *testing.T) {
 		t.Errorf("got %v\nwant %v", len(paths), want)
 	}
 
-	got := []string{}
+	var got []string
 	if err := filepath.Walk(td, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -103,12 +102,11 @@ func TestRenderIndex(t *testing.T) {
 	c := config.New()
 	c.Setwd(filepath.Dir(wd))
 	c.Repository = "k1LoW/octocov"
-	c.Central = &config.ConfigCentral{
-		Enable: internal.Bool(true),
-		Reports: config.ConfigCentralReports{
+	c.Central = &config.Central{
+		Reports: config.CentralReports{
 			Datastores: []string{"reports"},
 		},
-		Badges: config.ConfigCentralBadges{
+		Badges: config.CentralBadges{
 			Datastores: []string{"badges"},
 		},
 	}
@@ -117,14 +115,14 @@ func TestRenderIndex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bd, err := local.New(filepath.Join(c.Getwd(), "example/central/badges"))
+	bd, err := local.New(filepath.Join(c.Wd(), "example/central/badges"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctr := New(&CentralConfig{
+	ctr := New(&Config{
 		Repository:             c.Repository,
 		Index:                  c.Central.Root,
-		Wd:                     c.Getwd(),
+		Wd:                     c.Wd(),
 		Badges:                 []datastore.Datastore{bd},
 		Reports:                []datastore.Datastore{rd},
 		CoverageColor:          c.CoverageColor,

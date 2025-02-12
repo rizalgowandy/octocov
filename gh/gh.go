@@ -1,11 +1,16 @@
 package gh
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -17,17 +22,23 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	ghttp "github.com/go-git/go-git/v5/plumbing/transport/http"
-	"github.com/google/go-github/v39/github"
-	"github.com/k1LoW/go-github-client/v39/factory"
+	"github.com/google/go-github/v58/github"
+	"github.com/k1LoW/go-github-actions/artifact"
+	"github.com/k1LoW/go-github-client/v58/factory"
+	"github.com/k1LoW/repin"
 	"github.com/lestrrat-go/backoff/v2"
+	"github.com/shurcooL/githubv4"
+	"golang.org/x/oauth2"
 )
 
 const DefaultGithubServerURL = "https://github.com"
+const maxCopySize = 1073741824 // 1GB
 
 var octocovNameRe = regexp.MustCompile(`(?i)(octocov|coverage)`)
 
 type Gh struct {
-	client *github.Client
+	client   *github.Client
+	v4Client *githubv4.Client
 }
 
 func New() (*Gh, error) {
@@ -35,8 +46,13 @@ func New() (*Gh, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	token, _, _, v4ep := factory.GetTokenAndEndpoints()
+	v4c := githubv4.NewEnterpriseClient(v4ep, oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})))
+
 	return &Gh{
-		client: client,
+		client:   client,
+		v4Client: v4c,
 	}, nil
 }
 
@@ -99,7 +115,7 @@ func (g *Gh) PushContent(ctx context.Context, owner, repo, branch, content, cp, 
 		Tree:    tree,
 		Parents: []*github.Commit{parent},
 	}
-	resC, _, err := srv.CreateCommit(ctx, owner, repo, commit)
+	resC, _, err := srv.CreateCommit(ctx, owner, repo, commit, &github.CreateCommitOptions{})
 	if err != nil {
 		return err
 	}
@@ -118,7 +134,7 @@ func (g *Gh) PushContent(ctx context.Context, owner, repo, branch, content, cp, 
 	return nil
 }
 
-func (g *Gh) GetDefaultBranch(ctx context.Context, owner, repo string) (string, error) {
+func (g *Gh) FetchDefaultBranch(ctx context.Context, owner, repo string) (string, error) {
 	r, _, err := g.client.Repositories.Get(ctx, owner, repo)
 	if err != nil {
 		return "", err
@@ -126,8 +142,8 @@ func (g *Gh) GetDefaultBranch(ctx context.Context, owner, repo string) (string, 
 	return r.GetDefaultBranch(), nil
 }
 
-func (g *Gh) GetRawRootURL(ctx context.Context, owner, repo string) (string, error) {
-	b, err := g.GetDefaultBranch(ctx, owner, repo)
+func (g *Gh) FetchRawRootURL(ctx context.Context, owner, repo string) (string, error) {
+	b, err := g.FetchDefaultBranch(ctx, owner, repo)
 	if err != nil {
 		return "", err
 	}
@@ -155,7 +171,7 @@ func (g *Gh) GetRawRootURL(ctx context.Context, owner, repo string) (string, err
 		if err != nil {
 			return "", err
 		}
-		return strings.TrimSuffix(strings.TrimSuffix(fc.GetDownloadURL(), path), "/"), nil
+		return trimContentURL(fc.GetDownloadURL(), path)
 	}
 	return "", fmt.Errorf("not found files. please commit file to root directory and push: %s/%s", owner, repo)
 }
@@ -171,7 +187,7 @@ func (g *Gh) DetectCurrentJobID(ctx context.Context, owner, repo string) (int64,
 
 	// Although it would be nice if we could get the job_id from an environment variable,
 	// there is no way to get it at this time, so it uses a heuristic.
-	p := backoff.Exponential(
+	p := backoff.Exponential( //nostyle:funcfmt
 		backoff.WithMinInterval(time.Second),
 		backoff.WithMaxInterval(30*time.Second),
 		backoff.WithJitterFactor(0.05),
@@ -187,7 +203,7 @@ func (g *Gh) DetectCurrentJobID(ctx context.Context, owner, repo string) (int64,
 			return jobs.Jobs[0].GetID(), nil
 		}
 		for _, j := range jobs.Jobs {
-			if j.GetName() == os.Getenv("GTIHUB_JOB") {
+			if j.GetName() == os.Getenv("GITHUB_JOB") {
 				return j.GetID(), nil
 			}
 			for _, s := range j.Steps {
@@ -202,7 +218,7 @@ func (g *Gh) DetectCurrentJobID(ctx context.Context, owner, repo string) (int64,
 }
 
 func (g *Gh) DetectCurrentBranch(ctx context.Context) (string, error) {
-	splitted := strings.Split(os.Getenv("GITHUB_REF"), "/") // refs/pull/8/head or refs/heads/branch-name
+	splitted := strings.SplitN(os.Getenv("GITHUB_REF"), "/", 3) // refs/pull/8/head or refs/heads/branch/branch/name
 	if len(splitted) < 3 {
 		return "", fmt.Errorf("env %s is not set", "GITHUB_REF")
 	}
@@ -216,7 +232,10 @@ func (g *Gh) DetectCurrentBranch(ctx context.Context) (string, error) {
 }
 
 func (g *Gh) DetectCurrentPullRequestNumber(ctx context.Context, owner, repo string) (int, error) {
-	splitted := strings.Split(os.Getenv("GITHUB_REF"), "/") // refs/pull/8/head or refs/heads/branch-name
+	if os.Getenv("GITHUB_PULL_REQUEST_NUMBER") != "" {
+		return strconv.Atoi(os.Getenv("GITHUB_PULL_REQUEST_NUMBER"))
+	}
+	splitted := strings.Split(os.Getenv("GITHUB_REF"), "/") // refs/pull/8/head or refs/heads/branch/branch/name
 	if len(splitted) < 3 {
 		return 0, fmt.Errorf("env %s is not set", "GITHUB_REF")
 	}
@@ -224,7 +243,7 @@ func (g *Gh) DetectCurrentPullRequestNumber(ctx context.Context, owner, repo str
 		prNumber := splitted[2]
 		return strconv.Atoi(prNumber)
 	}
-	b := splitted[2]
+	b := strings.Join(splitted[2:], "/")
 	l, _, err := g.client.PullRequests.List(ctx, owner, repo, &github.PullRequestListOptions{
 		State: "open",
 	})
@@ -246,13 +265,63 @@ func (g *Gh) DetectCurrentPullRequestNumber(ctx context.Context, owner, repo str
 	return 0, errors.New("could not detect number of pull request")
 }
 
+func (g *Gh) ReplaceInsertToBody(ctx context.Context, owner, repo string, number int, content, key string) error {
+	sig := generateSig(key)
+	pr, _, err := g.client.PullRequests.Get(ctx, owner, repo, number)
+	if err != nil {
+		return err
+	}
+	current := pr.GetBody()
+	var rep string
+	if strings.Count(current, sig) < 2 {
+		rep = fmt.Sprintf("%s\n%s\n%s\n%s\n", current, sig, content, sig)
+	} else {
+		buf := new(bytes.Buffer)
+		if !strings.HasSuffix(current, "\n") {
+			current += "\n"
+		}
+		if _, err := repin.Replace(strings.NewReader(current), strings.NewReader(content), sig, sig, false, buf); err != nil {
+			return err
+		}
+		rep = buf.String()
+	}
+	if _, _, err := g.client.PullRequests.Edit(ctx, owner, repo, number, &github.PullRequest{
+		Body: &rep,
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+type PullRequest struct {
+	Number  int
+	IsDraft bool
+	Labels  []string
+}
+
+func (g *Gh) FetchPullRequest(ctx context.Context, owner, repo string, number int) (*PullRequest, error) {
+	pr, _, err := g.client.PullRequests.Get(ctx, owner, repo, number)
+	if err != nil {
+		return nil, err
+	}
+	var labels []string
+	for _, l := range pr.Labels {
+		labels = append(labels, l.GetName())
+	}
+	return &PullRequest{
+		Number:  pr.GetNumber(),
+		IsDraft: pr.GetDraft(),
+		Labels:  labels,
+	}, nil
+}
+
 type PullRequestFile struct {
 	Filename string
 	BlobURL  string
 }
 
-func (g *Gh) GetPullRequestFiles(ctx context.Context, owner, repo string, number int) ([]*PullRequestFile, error) {
-	files := []*PullRequestFile{}
+func (g *Gh) FetchPullRequestFiles(ctx context.Context, owner, repo string, number int) ([]*PullRequestFile, error) {
+	var files []*PullRequestFile
 	page := 1
 	for {
 		commitFiles, _, err := g.client.PullRequests.ListFiles(ctx, owner, repo, number, &github.ListOptions{
@@ -276,8 +345,31 @@ func (g *Gh) GetPullRequestFiles(ctx context.Context, owner, repo string, number
 	return files, nil
 }
 
-func (g *Gh) GetStepExecutionTimeByTime(ctx context.Context, owner, repo string, jobID int64, t time.Time) (time.Duration, error) {
-	p := backoff.Exponential(
+func (g *Gh) FetchChangedFiles(ctx context.Context, owner, repo string) ([]*PullRequestFile, error) {
+	base, err := g.FetchDefaultBranch(ctx, owner, repo)
+	if err != nil {
+		return nil, err
+	}
+	head, err := g.DetectCurrentBranch(ctx)
+	if err != nil {
+		return nil, err
+	}
+	compare, _, err := g.client.Repositories.CompareCommits(ctx, owner, repo, base, head, &github.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	var files []*PullRequestFile
+	for _, f := range compare.Files {
+		files = append(files, &PullRequestFile{
+			Filename: f.GetFilename(),
+			BlobURL:  f.GetBlobURL(),
+		})
+	}
+	return files, nil
+}
+
+func (g *Gh) FetchStepExecutionTimeByTime(ctx context.Context, owner, repo string, jobID int64, t time.Time) (time.Duration, error) {
+	p := backoff.Exponential( //nostyle:funcfmt
 		backoff.WithMinInterval(time.Second),
 		backoff.WithMaxInterval(30*time.Second),
 		backoff.WithJitterFactor(0.05),
@@ -303,11 +395,11 @@ func (g *Gh) GetStepExecutionTimeByTime(ctx context.Context, owner, repo string,
 			}
 		}
 	}
-	return 0, fmt.Errorf("the step that was executed at the relevant time (%v) does not exist in the job (%d).", t, jobID)
+	return 0, fmt.Errorf("the step that was executed at the relevant time (%v) does not exist in the job (%d)", t, jobID)
 }
 
-func (g *Gh) GetStepByTime(ctx context.Context, owner, repo string, jobID int64, t time.Time) (Step, error) {
-	p := backoff.Exponential(
+func (g *Gh) FetchStepByTime(ctx context.Context, owner, repo string, jobID int64, t time.Time) (Step, error) {
+	p := backoff.Exponential( //nostyle:funcfmt
 		backoff.WithMinInterval(time.Second),
 		backoff.WithMaxInterval(30*time.Second),
 		backoff.WithJitterFactor(0.05),
@@ -337,7 +429,7 @@ func (g *Gh) GetStepByTime(ctx context.Context, owner, repo string, jobID int64,
 			}
 		}
 	}
-	return Step{}, fmt.Errorf("the step that was executed at the relevant time (%v) does not exist in the job (%d).", t, jobID)
+	return Step{}, fmt.Errorf("the step that was executed at the relevant time (%v) does not exist in the job (%d)", t, jobID)
 }
 
 type Step struct {
@@ -346,7 +438,7 @@ type Step struct {
 	CompletedAt time.Time
 }
 
-func (g *Gh) GetStepsByName(ctx context.Context, owner, repo string, name string) ([]Step, error) {
+func (g *Gh) FetchStepsByName(ctx context.Context, owner, repo string, name string) ([]Step, error) {
 	if os.Getenv("GITHUB_RUN_ID") == "" {
 		return nil, fmt.Errorf("env %s is not set", "GITHUB_RUN_ID")
 	}
@@ -356,14 +448,14 @@ func (g *Gh) GetStepsByName(ctx context.Context, owner, repo string, name string
 	}
 	// Although it would be nice if we could get the job_id from an environment variable,
 	// there is no way to get it at this time, so it uses a heuristic.
-	p := backoff.Exponential(
+	p := backoff.Exponential( //nostyle:funcfmt
 		backoff.WithMinInterval(time.Second),
 		backoff.WithMaxInterval(30*time.Second),
 		backoff.WithJitterFactor(0.05),
 		backoff.WithMaxRetries(5),
 	)
 	b := p.Start(ctx)
-	steps := []Step{}
+	var steps []Step
 	max := 0
 L:
 	for backoff.Continue(b) {
@@ -401,66 +493,221 @@ L:
 	return steps, nil
 }
 
-const commentSig = "<!-- octocov -->"
-
-func (g *Gh) PutComment(ctx context.Context, owner, repo string, n int, comment string) error {
-	if err := g.deleteCurrentIssueComment(ctx, owner, repo, n); err != nil {
+func (g *Gh) PutComment(ctx context.Context, owner, repo string, n int, comment, key string) error {
+	sig := generateSig(key)
+	if err := g.minimizePreviousComments(ctx, owner, repo, n, sig); err != nil {
 		return err
 	}
-	c := strings.Join([]string{comment, commentSig}, "\n")
+	c := strings.Join([]string{comment, sig}, "\n")
 	if _, _, err := g.client.Issues.CreateComment(ctx, owner, repo, n, &github.IssueComment{Body: &c}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (g *Gh) deleteCurrentIssueComment(ctx context.Context, owner, repo string, n int) error {
-	opts := &github.IssueListCommentsOptions{}
-	comments, _, err := g.client.Issues.ListComments(ctx, owner, repo, n, opts)
-	if err != nil {
+func (g *Gh) PutCommentWithDeletion(ctx context.Context, owner, repo string, n int, comment, key string) error {
+	sig := generateSig(key)
+	if err := g.deletePreviousComments(ctx, owner, repo, n, sig); err != nil {
 		return err
 	}
-	for _, c := range comments {
-		if strings.Contains(*c.Body, commentSig) {
-			_, err = g.client.Issues.DeleteComment(ctx, owner, repo, *c.ID)
-			if err != nil {
-				return err
-			}
-		}
+	c := strings.Join([]string{comment, sig}, "\n")
+	if _, _, err := g.client.Issues.CreateComment(ctx, owner, repo, n, &github.IssueComment{Body: &c}); err != nil {
+		return err
 	}
 	return nil
 }
 
-func PushUsingLocalGit(ctx context.Context, gitRoot string, addPaths []string, message string) error {
-	r, err := git.PlainOpen(gitRoot)
-	if err != nil {
-		return err
+func (g *Gh) PutArtifact(ctx context.Context, name, fp string, content []byte) error {
+	return artifact.Upload(ctx, name, fp, bytes.NewReader(content))
+}
+
+type ArtifactFile struct {
+	Name      string
+	Content   []byte
+	CreatedAt time.Time
+}
+
+func (g *Gh) FetchLatestArtifact(ctx context.Context, owner, repo, name, fp string) (*ArtifactFile, error) {
+	const maxRedirect = 5
+	page := 1
+	for {
+		l, res, err := g.client.Actions.ListArtifacts(ctx, owner, repo, &github.ListOptions{
+			Page:    page,
+			PerPage: 100,
+		})
+		if err != nil {
+			return nil, err
+		}
+		page += 1
+		for _, a := range l.Artifacts {
+			if a.GetName() != name {
+				continue
+			}
+			u, _, err := g.client.Actions.DownloadArtifact(ctx, owner, repo, a.GetID(), maxRedirect)
+			if err != nil {
+				return nil, err
+			}
+			resp, err := http.Get(u.String())
+			if err != nil {
+				return nil, err
+			}
+			buf := new(bytes.Buffer)
+			size, err := io.CopyN(buf, resp.Body, maxCopySize)
+			if !errors.Is(err, io.EOF) {
+				return nil, err
+			}
+			if size >= maxCopySize {
+				return nil, fmt.Errorf("too large file size to copy: %d >= %d", size, maxCopySize)
+			}
+			reader, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+			if err != nil {
+				return nil, err
+			}
+			for _, file := range reader.File {
+				if file.Name != fp {
+					continue
+				}
+				in, err := file.Open()
+				if err != nil {
+					return nil, err
+				}
+				out := new(bytes.Buffer)
+				size, err := io.CopyN(out, in, maxCopySize)
+				if !errors.Is(err, io.EOF) {
+					_ = in.Close() //nostyle:handlerrors
+					return nil, err
+				}
+				if size >= maxCopySize {
+					_ = in.Close() //nostyle:handlerrors
+					return nil, fmt.Errorf("too large file size to copy: %d >= %d", size, maxCopySize)
+				}
+				if err := in.Close(); err != nil {
+					return nil, err
+				}
+				return &ArtifactFile{
+					Name:      file.Name,
+					Content:   out.Bytes(),
+					CreatedAt: a.CreatedAt.Time,
+				}, nil
+			}
+		}
+		if res.NextPage == 0 {
+			break
+		}
 	}
-	w, err := r.Worktree()
+	return nil, errors.New("artifact not found")
+}
+
+func (g *Gh) IsPrivate(ctx context.Context, owner, repo string) (bool, error) {
+	r, _, err := g.client.Repositories.Get(ctx, owner, repo)
 	if err != nil {
-		return err
+		return false, err
 	}
-	status, err := w.Status()
-	if err != nil {
-		return err
-	}
-	push := false
-	for _, p := range addPaths {
-		rel, err := filepath.Rel(gitRoot, p)
+	return r.GetPrivate(), nil
+}
+
+type minimizeCommentMutation struct {
+	MinimizeComment struct {
+		MinimizedComment struct {
+			IsMinimized bool
+		}
+	} `graphql:"minimizeComment(input: $input)"`
+}
+
+func (g *Gh) minimizePreviousComments(ctx context.Context, owner, repo string, n int, sig string) error {
+	page := 1
+	for {
+		opts := &github.IssueListCommentsOptions{
+			ListOptions: github.ListOptions{
+				Page:    page,
+				PerPage: 100,
+			},
+		}
+		comments, res, err := g.client.Issues.ListComments(ctx, owner, repo, n, opts)
 		if err != nil {
 			return err
 		}
+		for _, c := range comments {
+			if strings.Contains(*c.Body, sig) {
+				var m minimizeCommentMutation
+				input := githubv4.MinimizeCommentInput{
+					SubjectID:        githubv4.ID(c.GetNodeID()),
+					Classifier:       githubv4.ReportedContentClassifiers("OUTDATED"),
+					ClientMutationID: nil,
+				}
+				if err := g.v4Client.Mutate(ctx, &m, input, nil); err != nil {
+					return err
+				}
+			}
+		}
+		if res.NextPage == 0 {
+			break
+		}
+		page = res.NextPage
+	}
+	return nil
+}
+
+func (g *Gh) deletePreviousComments(ctx context.Context, owner, repo string, n int, sig string) error {
+	page := 1
+	for {
+		opts := &github.IssueListCommentsOptions{
+			ListOptions: github.ListOptions{
+				Page:    page,
+				PerPage: 100,
+			},
+		}
+		comments, res, err := g.client.Issues.ListComments(ctx, owner, repo, n, opts)
+		if err != nil {
+			return err
+		}
+		for _, c := range comments {
+			if strings.Contains(*c.Body, sig) {
+				_, err = g.client.Issues.DeleteComment(ctx, owner, repo, *c.ID)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		if res.NextPage == 0 {
+			break
+		}
+		page = res.NextPage
+	}
+	return nil
+}
+
+func PushUsingLocalGit(ctx context.Context, gitRoot string, addPaths []string, message string) (int, error) {
+	r, err := git.PlainOpen(gitRoot)
+	if err != nil {
+		return 0, err
+	}
+	w, err := r.Worktree()
+	if err != nil {
+		return 0, err
+	}
+	status, err := w.Status()
+	if err != nil {
+		return 0, err
+	}
+
+	c := 0
+	for _, p := range addPaths {
+		rel, err := filepath.Rel(gitRoot, p)
+		if err != nil {
+			return 0, err
+		}
 		if _, ok := status[rel]; ok {
-			push = true
+			c += 1
 			_, err := w.Add(rel)
 			if err != nil {
-				return err
+				return 0, err
 			}
 		}
 	}
 
-	if !push {
-		return nil
+	if c == 0 {
+		return c, nil
 	}
 
 	opts := &git.CommitOptions{}
@@ -479,7 +726,7 @@ func PushUsingLocalGit(ctx context.Context, gitRoot string, addPaths []string, m
 		}
 	}
 	if _, err := w.Commit(message, opts); err != nil {
-		return err
+		return c, err
 	}
 
 	if err := r.PushContext(ctx, &git.PushOptions{
@@ -487,30 +734,30 @@ func PushUsingLocalGit(ctx context.Context, gitRoot string, addPaths []string, m
 			Username: "octocov",
 			Password: os.Getenv("GITHUB_TOKEN"),
 		},
-	}); err != nil && err != git.NoErrAlreadyUpToDate {
-		return err
+	}); err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+		return c, err
 	}
 
-	return nil
+	return c, nil
 }
 
 type GitHubEvent struct {
 	Name    string
 	Number  int
 	State   string
-	Payload interface{}
+	Payload any
 }
 
 func DecodeGitHubEvent() (*GitHubEvent, error) {
 	i := &GitHubEvent{}
 	n := os.Getenv("GITHUB_EVENT_NAME")
 	if n == "" {
-		return i, fmt.Errorf("env %s is not set.", "GITHUB_EVENT_NAME")
+		return i, fmt.Errorf("env %s is not set", "GITHUB_EVENT_NAME")
 	}
 	i.Name = n
 	p := os.Getenv("GITHUB_EVENT_PATH")
 	if p == "" {
-		return i, fmt.Errorf("env %s is not set.", "GITHUB_EVENT_PATH")
+		return i, fmt.Errorf("env %s is not set", "GITHUB_EVENT_PATH")
 	}
 	b, err := os.ReadFile(filepath.Clean(p))
 	if err != nil {
@@ -538,7 +785,7 @@ func DecodeGitHubEvent() (*GitHubEvent, error) {
 		i.State = s.Issue.State
 	}
 
-	var payload interface{}
+	var payload any
 
 	if err := json.Unmarshal(b, &payload); err != nil {
 		return i, err
@@ -585,4 +832,20 @@ func Parse(raw string) (*Repository, error) {
 	}
 
 	return r, nil
+}
+
+// trimContentURL trim suffix path and private token.
+func trimContentURL(u, p string) (string, error) {
+	parsed, err := url.Parse(u) //nostyle:handlerrors
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(parsed.String(), fmt.Sprintf("?%s", parsed.RawQuery)), p), "/"), nil
+}
+
+func generateSig(key string) string {
+	if key == "" {
+		return "<!-- octocov -->"
+	}
+	return fmt.Sprintf("<!-- octocov:%s -->", key)
 }

@@ -22,6 +22,7 @@ THE SOFTWARE.
 package main
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -39,10 +40,9 @@ func main() {
 			continue
 		}
 		k2 := strings.TrimPrefix(k, envPrefix)
-		if os.Getenv(k2) == "" {
-			if err := os.Setenv(k2, v); err != nil {
-				panic(err)
-			}
+		if err := os.Setenv(k2, v); err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, err) //nostyle:handlerrors
+			os.Exit(1)
 		}
 	}
 	cmd.Execute()
