@@ -22,16 +22,17 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 
 	"github.com/k1LoW/octocov/config"
-	"github.com/k1LoW/octocov/pkg/coverage"
+	"github.com/k1LoW/octocov/coverage"
 	"github.com/k1LoW/octocov/report"
 	"github.com/spf13/cobra"
 )
 
-// viewCmd represents the view command
+// viewCmd represents the view command.
 var viewCmd = &cobra.Command{
 	Use:     "view [FILE ...]",
 	Short:   "view code coverage of file",
@@ -49,14 +50,14 @@ var viewCmd = &cobra.Command{
 			c.CodeToTestRatio = nil
 			c.TestExecutionTime = nil
 		}
-		if err := c.CoverageConfigReady(); err != nil {
-			return err
+		if c.Coverage == nil {
+			return errors.New("coverage: is not set")
 		}
 		r, err := report.New(c.Repository)
 		if err != nil {
 			return err
 		}
-		if err := r.MeasureCoverage(c.Coverage.Paths); err != nil {
+		if err := r.MeasureCoverage(c.Coverage.Paths, c.Coverage.Exclude); err != nil {
 			return err
 		}
 		for _, f := range args {
@@ -64,13 +65,18 @@ var viewCmd = &cobra.Command{
 				if _, err := os.Stat(f); err != nil {
 					return err
 				}
-				fc, _ := r.Coverage.Files.FuzzyFindByFile(f)
 				fp, err := os.Open(filepath.Clean(f))
 				if err != nil {
 					return err
 				}
+				fc, err := r.Coverage.Files.FuzzyFindByFile(f)
+				if err != nil {
+					fc = &coverage.FileCoverage{
+						File: f,
+					}
+				}
 				if err := coverage.NewPrinter(fc).Print(fp, os.Stdout); err != nil {
-					_ = fp.Close()
+					_ = fp.Close() //nostyle:handlerrors
 					return err
 				}
 				if err := fp.Close(); err != nil {
@@ -88,5 +94,6 @@ var viewCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(viewCmd)
+	viewCmd.Flags().StringVarP(&configPath, "config", "", "", "config file path")
 	viewCmd.Flags().StringVarP(&reportPath, "report", "r", "", "coverage report file path")
 }

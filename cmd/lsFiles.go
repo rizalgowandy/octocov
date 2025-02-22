@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,7 +38,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// lsFilesCmd represents the lsFiles command
+// lsFilesCmd represents the lsFiles command.
 var lsFilesCmd = &cobra.Command{
 	Use:   "ls-files",
 	Short: "list files logged in code coverage report",
@@ -53,14 +54,14 @@ var lsFilesCmd = &cobra.Command{
 			c.CodeToTestRatio = nil
 			c.TestExecutionTime = nil
 		}
-		if err := c.CoverageConfigReady(); err != nil {
-			return err
+		if c.Coverage == nil {
+			return errors.New("coverage: is not set")
 		}
 		r, err := report.New(c.Repository)
 		if err != nil {
 			return err
 		}
-		if err := r.MeasureCoverage(c.Coverage.Paths); err != nil {
+		if err := r.MeasureCoverage(c.Coverage.Paths, c.Coverage.Exclude); err != nil {
 			return err
 		}
 		t := 0
@@ -78,16 +79,16 @@ var lsFilesCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		gitRoot, err := internal.GetRootPath(wd)
+		gitRoot, err := internal.RootPath(wd)
 		if err != nil {
 			return err
 		}
-		cfiles := []string{}
+		var cfiles []string
 		for _, f := range r.Coverage.Files {
 			cfiles = append(cfiles, f.File)
 		}
-		files := []string{}
-		if err := filepath.Walk(gitRoot, func(path string, info os.FileInfo, err error) error {
+		var files []string
+		if err := filepath.Walk(wd, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
@@ -122,7 +123,7 @@ var lsFilesCmd = &cobra.Command{
 				return err
 			}
 			w := len(strconv.Itoa(t))*2 + 1
-			cmd.Printf("%s [%s] %s\n", c.Sprint(fmt.Sprintf("%5s%%", fmt.Sprintf("%.1f", cover))), fmt.Sprintf(fmt.Sprintf("%%%ds", w), fmt.Sprintf("%d/%d", f.Covered, f.Total)), trimed)
+			cmd.Printf("%s [%s] %s\n", c.Sprint(fmt.Sprintf("%5s%%", fmt.Sprintf("%.1f", floor1(cover)))), fmt.Sprintf(fmt.Sprintf("%%%ds", w), fmt.Sprintf("%d/%d", f.Covered, f.Total)), trimed)
 		}
 
 		return nil
@@ -130,9 +131,18 @@ var lsFilesCmd = &cobra.Command{
 }
 
 func detectTermColor(cl string) (*color.Color, error) {
-	termGreen, _ := colorful.Hex("#4e9a06")
-	termYellow, _ := colorful.Hex("#c4a000")
-	termRed, _ := colorful.Hex("#cc0000")
+	termGreen, err := colorful.Hex("#4e9a06")
+	if err != nil {
+		return nil, err
+	}
+	termYellow, err := colorful.Hex("#c4a000")
+	if err != nil {
+		return nil, err
+	}
+	termRed, err := colorful.Hex("#cc0000")
+	if err != nil {
+		return nil, err
+	}
 	tc, err := colorful.Hex(cl)
 	if err != nil {
 		return nil, err
@@ -158,5 +168,6 @@ func detectTermColor(cl string) (*color.Color, error) {
 
 func init() {
 	rootCmd.AddCommand(lsFilesCmd)
+	lsFilesCmd.Flags().StringVarP(&configPath, "config", "", "", "config file path")
 	lsFilesCmd.Flags().StringVarP(&reportPath, "report", "r", "", "coverage report file path")
 }

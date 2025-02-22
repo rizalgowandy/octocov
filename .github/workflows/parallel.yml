@@ -1,31 +1,92 @@
 name: parallel
 
-on: workflow_dispatch
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
 
 jobs:
-  job-parallel:
-    name: parallel tests
+  test-pkgs:
+    name: test pkgs
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go_version: [1.17]
-        parallel: [0,1,2]
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests coverage
+        run: go test ./coverage/... -coverprofile=coverage_coverage.out -covermode=count
+
+      - name: Run tests ratio
+        run: go test ./ratio/... -coverprofile=coverage_ratio.out -covermode=count
+
+      - name: Run tests badge
+        run: go test ./badge/... -coverprofile=coverage_badge.out -covermode=count
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-files-pkgs
+          path: |
+            coverage_coverage.out
+            coverage_ratio.out
+            coverage_badge.out
+
+  test-other:
+    name: test other
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests other
+        run: go test $(go list ./... | grep -v coverage | grep -v ratio | grep -v badge) -coverprofile=coverage_other.out -covermode=count
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-files-other
+          path: |
+            coverage_other.out
+
+  collect-metrics:
+    name: collect metrics
+    needs:
+      - test-pkgs
+      - test-other
+    runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       DEBUG: 1
     steps:
-      - name: Set up Go ${{ matrix.go_version }}
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go_version }}
-
       - name: Check out source code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Run tests ${{ matrix.parallel }}
-        run: make ci
+      - name: Set up Go
+        id: setup-go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
 
-      - name: Run build octocov
-        run: |
-          make build
-          ./octocov --dump --config testdata/octocov_parallel_tests.yml
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-report-files*
+          merge-multiple: true
+
+      - name: Build octocov and run as a action
+        uses: ./testdata/actions/collect
+        env:
+          GOTOOLCHAIN: 'go${{ steps.setup-go.outputs.go-version }}'

@@ -33,16 +33,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/k1LoW/octocov/badge"
 	"github.com/k1LoW/octocov/central"
 	"github.com/k1LoW/octocov/config"
 	"github.com/k1LoW/octocov/datastore"
 	"github.com/k1LoW/octocov/gh"
 	"github.com/k1LoW/octocov/internal"
-	"github.com/k1LoW/octocov/pkg/badge"
 	"github.com/k1LoW/octocov/report"
 	"github.com/k1LoW/octocov/version"
 	"github.com/spf13/cobra"
 )
+
+const defaultCommitMessage = "Update by octocov"
 
 var (
 	configPath  string
@@ -62,8 +64,7 @@ var rootCmd = &cobra.Command{
 			return printMetrics(cmd)
 		}
 
-		ctx := context.Background()
-		addPaths := []string{}
+		var addPaths []string
 		cmd.PrintErrf("%s version %s\n", version.Name, version.Version)
 
 		c := config.New()
@@ -73,8 +74,11 @@ var rootCmd = &cobra.Command{
 		c.Build()
 
 		if !c.Loaded() {
-			cmd.PrintErrf("%s are not found\n", strings.Join(config.DefaultConfigFilePaths, " and "))
+			cmd.PrintErrf("%s are not found\n", strings.Join(config.DefaultPaths, " and "))
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
+		defer cancel()
 
 		if reportPath != "" {
 			c.Coverage.Paths = []string{reportPath}
@@ -82,57 +86,82 @@ var rootCmd = &cobra.Command{
 			c.TestExecutionTime = nil
 		}
 
-		if c.Central != nil && internal.IsEnable(c.Central.Enable) {
+		if c.Central != nil {
 			cmd.PrintErrln("Central mode enabled")
 			if err := c.CentralConfigReady(); err != nil {
 				return err
 			}
 
-			badges := []datastore.Datastore{}
+			var badges []datastore.Datastore
 			for _, s := range c.Central.Badges.Datastores {
-				d, err := datastore.New(ctx, s, c.Root())
+				d, err := datastore.New(ctx, s, datastore.Root(c.Root()))
 				if err != nil {
 					return err
 				}
 				badges = append(badges, d)
 			}
 
-			reports := []datastore.Datastore{}
+			var reports []datastore.Datastore
 			for _, s := range c.Central.Reports.Datastores {
-				d, err := datastore.New(ctx, s, c.Root())
+				d, err := datastore.New(ctx, s, datastore.Root(c.Root()))
 				if err != nil {
 					return err
 				}
 				reports = append(reports, d)
 			}
 
-			ctr := central.New(&central.CentralConfig{
+			ctr := central.New(&central.Config{
 				Repository:             c.Repository,
 				Index:                  c.Central.Root,
-				Wd:                     c.Getwd(),
+				Wd:                     c.Wd(),
 				Badges:                 badges,
 				Reports:                reports,
 				CoverageColor:          c.CoverageColor,
 				CodeToTestRatioColor:   c.CodeToTestRatioColor,
 				TestExecutionTimeColor: c.TestExecutionTimeColor,
 			})
+
 			paths, err := ctr.Generate(ctx)
 			if err != nil {
 				return err
 			}
+
+			// re report
+			if err := c.CentralReReportReady(); err != nil {
+				cmd.PrintErrf("Skip re storing report: %v\n", err)
+			} else {
+				cmd.PrintErrln("Storing re-report...")
+				for _, r := range ctr.CollectedReports() {
+					if err := reportToDatastores(ctx, c, c.Central.ReReport.Datastores, r); err != nil {
+						return err
+					}
+				}
+				// TODO: Get the path to the report stored in local:// and target it for git push
+			}
+
 			// git push
 			if err := c.CentralPushConfigReady(); err != nil {
 				cmd.PrintErrf("Skip commit and push central report: %v\n", err)
 			} else {
 				cmd.PrintErrln("Commit and push central report")
-				if err := gh.PushUsingLocalGit(ctx, c.GitRoot, paths, "Update by octocov"); err != nil {
+
+				m := defaultCommitMessage
+				if c.Central.Push.Message != "" {
+					m = c.Central.Push.Message
+				}
+
+				c, err := gh.PushUsingLocalGit(ctx, c.GitRoot, paths, m)
+				if err != nil {
 					return err
+				}
+				if c == 0 {
+					cmd.PrintErrln("No files to be commit")
 				}
 			}
 			return nil
 		}
 
-		r, err := report.New(c.Repository)
+		r, err := report.New(c.Repository, report.Locale(c.Locale))
 		if err != nil {
 			return err
 		}
@@ -140,7 +169,7 @@ var rootCmd = &cobra.Command{
 		if err := c.CoverageConfigReady(); err != nil {
 			cmd.PrintErrf("Skip measuring code coverage: %v\n", err)
 		} else {
-			if err := r.MeasureCoverage(c.Coverage.Paths); err != nil {
+			if err := r.MeasureCoverage(c.Coverage.Paths, c.Coverage.Exclude); err != nil {
 				cmd.PrintErrf("Skip measuring code coverage: %v\n", err)
 			}
 		}
@@ -156,7 +185,7 @@ var rootCmd = &cobra.Command{
 		if err := c.TestExecutionTimeConfigReady(); err != nil {
 			cmd.PrintErrf("Skip measuring test execution time: %v\n", err)
 		} else {
-			stepNames := []string{}
+			var stepNames []string
 			if len(c.TestExecutionTime.Steps) > 0 {
 				stepNames = c.TestExecutionTime.Steps
 			}
@@ -165,8 +194,16 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
+		if err := r.CollectCustomMetrics(); err != nil {
+			cmd.PrintErrf("Skip collecting custom metrics: %v\n", err)
+		}
+
 		if r.CountMeasured() == 0 {
 			return errors.New("nothing could be measured")
+		}
+
+		if err := r.Validate(); err != nil {
+			return fmt.Errorf("validation error: %w", err)
 		}
 
 		cmd.Println("")
@@ -182,28 +219,19 @@ var rootCmd = &cobra.Command{
 					cmd.PrintErrf("Skip generating badge: %s\n", "coverage is not measured")
 					return nil
 				}
-				var out *os.File
 				cp := r.CoveragePercent()
-				if c.Coverage.Badge.Path == "" {
-					out = os.Stdout
-				} else {
-					cmd.PrintErrln("Generate coverage report badge...")
-					err := os.MkdirAll(filepath.Dir(c.Coverage.Badge.Path), 0755) // #nosec
-					if err != nil {
-						return err
-					}
-					bp, err := filepath.Abs(filepath.Clean(c.Coverage.Badge.Path))
-					if err != nil {
-						return err
-					}
-					out, err = os.OpenFile(bp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644) // #nosec
-					if err != nil {
-						return err
-					}
-					addPaths = append(addPaths, bp)
+				cmd.PrintErrln("Generate coverage report badge...")
+				out, err := badgeFile(c.Coverage.Badge.Path)
+				if err != nil {
+					return err
 				}
+				bp, err := filepath.Abs(filepath.Clean(c.Coverage.Badge.Path))
+				if err != nil {
+					return err
+				}
+				addPaths = append(addPaths, bp)
 
-				b := badge.New("coverage", fmt.Sprintf("%.1f%%", cp))
+				b := badge.New("coverage", fmt.Sprintf("%.1f%%", floor1(cp)))
 				b.MessageColor = c.CoverageColor(cp)
 				if err := b.AddIcon(internal.Icon); err != nil {
 					return err
@@ -225,28 +253,19 @@ var rootCmd = &cobra.Command{
 					return nil
 				}
 
-				var out *os.File
 				tr := r.CodeToTestRatioRatio()
-				if c.CodeToTestRatio.Badge.Path == "" {
-					out = os.Stdout
-				} else {
-					cmd.PrintErrln("Generate code-to-test-ratio report badge...")
-					err := os.MkdirAll(filepath.Dir(c.CodeToTestRatio.Badge.Path), 0755) // #nosec
-					if err != nil {
-						return err
-					}
-					bp, err := filepath.Abs(filepath.Clean(c.CodeToTestRatio.Badge.Path))
-					if err != nil {
-						return err
-					}
-					out, err = os.OpenFile(bp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644) // #nosec
-					if err != nil {
-						return err
-					}
-					addPaths = append(addPaths, bp)
+				cmd.PrintErrln("Generate code-to-test-ratio report badge...")
+				out, err := badgeFile(c.CodeToTestRatio.Badge.Path)
+				if err != nil {
+					return err
 				}
+				bp, err := filepath.Abs(filepath.Clean(c.CodeToTestRatio.Badge.Path))
+				if err != nil {
+					return err
+				}
+				addPaths = append(addPaths, bp)
 
-				b := badge.New("code to test ratio", fmt.Sprintf("1:%.1f", tr))
+				b := badge.New("code to test ratio", fmt.Sprintf("1:%.1f", floor1(tr)))
 				b.MessageColor = c.CodeToTestRatioColor(tr)
 				if err := b.AddIcon(internal.Icon); err != nil {
 					return err
@@ -268,25 +287,16 @@ var rootCmd = &cobra.Command{
 					return nil
 				}
 
-				var out *os.File
-				if c.TestExecutionTime.Badge.Path == "" {
-					out = os.Stdout
-				} else {
-					cmd.PrintErrln("Generate test-execution-time report badge...")
-					err := os.MkdirAll(filepath.Dir(c.TestExecutionTime.Badge.Path), 0755) // #nosec
-					if err != nil {
-						return err
-					}
-					bp, err := filepath.Abs(filepath.Clean(c.TestExecutionTime.Badge.Path))
-					if err != nil {
-						return err
-					}
-					out, err = os.OpenFile(bp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644) // #nosec
-					if err != nil {
-						return err
-					}
-					addPaths = append(addPaths, bp)
+				cmd.PrintErrln("Generate test-execution-time report badge...")
+				out, err := badgeFile(c.TestExecutionTime.Badge.Path)
+				if err != nil {
+					return err
 				}
+				bp, err := filepath.Abs(filepath.Clean(c.TestExecutionTime.Badge.Path))
+				if err != nil {
+					return err
+				}
+				addPaths = append(addPaths, bp)
 
 				d := time.Duration(r.TestExecutionTimeNano())
 				b := badge.New("test execution time", d.String())
@@ -306,13 +316,15 @@ var rootCmd = &cobra.Command{
 		// Get previous report for comparing reports
 		var rPrev *report.Report
 		if err := c.DiffConfigReady(); err == nil {
+			log.Println("Get previous report for comparing reports")
 			repo, err := gh.Parse(c.Repository)
 			if err != nil {
 				return err
 			}
 			path := fmt.Sprintf("%s/%s/report.json", repo.Owner, repo.Reponame())
 			for _, s := range c.Diff.Datastores {
-				d, err := datastore.New(ctx, s, c.Root())
+				log.Printf("Get previous report from %s", s)
+				d, err := datastore.New(ctx, s, datastore.Root(c.Root()), datastore.Report(r))
 				if err != nil {
 					return err
 				}
@@ -322,27 +334,31 @@ var rootCmd = &cobra.Command{
 				}
 				f, err := fsys.Open(path)
 				if err != nil {
+					log.Printf("%s: %v", s, err)
 					continue
 				}
 				defer f.Close()
 				b, err := io.ReadAll(f)
 				if err != nil {
+					log.Printf("%s: %v", s, err)
 					continue
 				}
 				rt := &report.Report{}
 				if err := json.Unmarshal(b, rt); err != nil {
+					log.Printf("%s: %v %s", s, err, string(b))
 					continue
 				}
+				// Select latest report
 				if rPrev == nil || rPrev.Timestamp.UnixNano() < rt.Timestamp.UnixNano() {
 					rPrev = rt
 				}
 			}
 			if c.Diff.Path != "" {
-				rt, err := report.New(c.Repository)
+				rt, err := report.New(c.Repository, report.Locale(c.Locale))
 				if err != nil {
 					return err
 				}
-				if err := rt.MeasureCoverage([]string{c.Diff.Path}); err == nil {
+				if err := rt.MeasureCoverage([]string{c.Diff.Path}, c.Coverage.Exclude); err == nil {
 					if rPrev == nil || rPrev.Timestamp.UnixNano() < rt.Timestamp.UnixNano() {
 						rPrev = rt
 					}
@@ -356,21 +372,78 @@ var rootCmd = &cobra.Command{
 		} else {
 			if err := func() error {
 				cmd.PrintErrln("Commenting report...")
-				if err := c.DiffConfigReady(); rPrev == nil || err != nil {
+				if rPrev == nil {
+					cmd.PrintErrln("Skip comparing reports: previous report not found")
+				}
+				if err := c.DiffConfigReady(); err != nil {
 					cmd.PrintErrf("Skip comparing reports: %v\n", err)
 				}
-				if err := commentReport(ctx, c, r, rPrev); err != nil {
+				content, err := createReportContent(ctx, c, r, rPrev, c.Comment.HideFooterLink)
+				if err != nil {
+					return err
+				}
+				if err := commentReport(ctx, c, content, r.Key()); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				cmd.PrintErrf("Skip commenting the report to pull request: %v\n", err)
+				cmd.PrintErrf("Skip commenting report to pull request: %v\n", err)
+			}
+		}
+
+		// Add report to job summary page
+		if err := c.SummaryConfigReady(); err != nil {
+			cmd.PrintErrf("Skip adding report to job summary page: %v\n", err)
+		} else {
+			if err := func() error {
+				cmd.PrintErrln("Adding report to job summary page...")
+				if rPrev == nil {
+					cmd.PrintErrln("Skip comparing reports: previous report not found")
+				}
+				if err := c.DiffConfigReady(); err != nil {
+					cmd.PrintErrf("Skip comparing reports: %v\n", err)
+				}
+				content, err := createReportContent(ctx, c, r, rPrev, c.Summary.HideFooterLink)
+				if err != nil {
+					return err
+				}
+				if err := addReportContentToSummary(content); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				cmd.PrintErrf("Skip adding report to job summary page: %v\n", err)
+			}
+		}
+
+		// Insert report to body of pull request
+		if err := c.BodyConfigReady(); err != nil {
+			cmd.PrintErrf("Skip inserting report to body of pull request: %v\n", err)
+		} else {
+			if err := func() error {
+				cmd.PrintErrln("Inserting report...")
+				if rPrev == nil {
+					cmd.PrintErrln("Skip comparing reports: previous report not found")
+				}
+				if err := c.DiffConfigReady(); err != nil {
+					cmd.PrintErrf("Skip comparing reports: %v\n", err)
+				}
+				content, err := createReportContent(ctx, c, r, rPrev, c.Body.HideFooterLink)
+				if err != nil {
+					return err
+				}
+				if err := replaceInsertReportToBody(ctx, c, content, r.Key()); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				cmd.PrintErrf("Skip inserting report to body of pull request: %v\n", err)
 			}
 		}
 
 		// Store report
 		if err := c.ReportConfigReady(); err != nil {
-			cmd.PrintErrf("Skip storing the report: %v\n", err)
+			cmd.PrintErrf("Skip storing report: %v\n", err)
 		} else {
 			cmd.PrintErrln("Storing report...")
 			if c.Report.Path != "" {
@@ -378,29 +451,13 @@ var rootCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
-				if err := os.WriteFile(rp, r.Bytes(), os.ModePerm); err != nil {
+				if err := os.WriteFile(rp, r.Bytes(), os.ModePerm); err != nil { //nolint:gosec
 					return err
 				}
 				addPaths = append(addPaths, rp)
 			}
-			if r.Coverage != nil {
-				r.Coverage.DeleteBlockCoverages()
-			}
-			if r.CodeToTestRatio != nil {
-				r.CodeToTestRatio.DeleteFiles()
-			}
-			datastores := []datastore.Datastore{}
-			for _, s := range c.Report.Datastores {
-				d, err := datastore.New(ctx, s, c.Root())
-				if err != nil {
-					return err
-				}
-				datastores = append(datastores, d)
-			}
-			for _, d := range datastores {
-				if err := d.StoreReport(ctx, r); err != nil {
-					return err
-				}
+			if err := reportToDatastores(ctx, c, c.Report.Datastores, r); err != nil {
+				return err
 			}
 		}
 
@@ -409,8 +466,18 @@ var rootCmd = &cobra.Command{
 			cmd.PrintErrf("Skip pushing generate files: %v\n", err)
 		} else {
 			cmd.PrintErrln("Pushing generated files...")
-			if err := gh.PushUsingLocalGit(ctx, c.GitRoot, addPaths, "Update by octocov"); err != nil {
+
+			m := defaultCommitMessage
+			if c.Push.Message != "" {
+				m = c.Push.Message
+			}
+
+			c, err := gh.PushUsingLocalGit(ctx, c.GitRoot, addPaths, m)
+			if err != nil {
 				return err
+			}
+			if c == 0 {
+				cmd.PrintErrln("No files to be commit")
 			}
 		}
 
@@ -424,6 +491,7 @@ var rootCmd = &cobra.Command{
 }
 
 func printMetrics(cmd *cobra.Command) error {
+	ctx := context.Background()
 	c := config.New()
 	if err := c.Load(configPath); err != nil {
 		return err
@@ -434,13 +502,13 @@ func printMetrics(cmd *cobra.Command) error {
 		c.CodeToTestRatio = nil
 		c.TestExecutionTime = nil
 	}
-	r, err := report.New(c.Repository)
+	r, err := report.New(c.Repository, report.Locale(c.Locale))
 	if err != nil {
 		return err
 	}
 
-	if err := c.CoverageConfigReady(); err == nil {
-		if err := r.MeasureCoverage(c.Coverage.Paths); err != nil {
+	if err := c.CoverageConfigReadyOnLocal(); err == nil {
+		if err := r.MeasureCoverage(c.Coverage.Paths, c.Coverage.Exclude); err != nil {
 			cmd.PrintErrf("Skip measuring code coverage: %v\n", err)
 		}
 	}
@@ -449,6 +517,20 @@ func printMetrics(cmd *cobra.Command) error {
 		if err := r.MeasureCodeToTestRatio(c.Root(), c.CodeToTestRatio.Code, c.CodeToTestRatio.Test); err != nil {
 			cmd.PrintErrf("Skip measuring code to test ratio: %v\n", err)
 		}
+	}
+
+	if err := c.TestExecutionTimeConfigReady(); r.Repository != "" && err == nil {
+		var stepNames []string
+		if len(c.TestExecutionTime.Steps) > 0 {
+			stepNames = c.TestExecutionTime.Steps
+		}
+		if err := r.MeasureTestExecutionTime(ctx, stepNames); err != nil {
+			cmd.PrintErrf("Skip measuring test execution time: %v\n", err)
+		}
+	}
+
+	if err := r.CollectCustomMetrics(); err != nil {
+		cmd.PrintErrf("Skip collecting custom metrics: %v\n", err)
 	}
 
 	if r.CountMeasured() == 0 {
@@ -468,6 +550,55 @@ func init() {
 	rootCmd.Flags().StringVarP(&configPath, "config", "", "", "config file path")
 	rootCmd.Flags().StringVarP(&reportPath, "report", "r", "", "coverage report file path")
 	rootCmd.Flags().BoolVarP(&createTable, "create-bq-table", "", false, "create table of BigQuery dataset")
+}
+
+func reportToDatastores(ctx context.Context, c *config.Config, datastores []string, r *report.Report) error {
+	for _, s := range datastores {
+		if datastore.NeedToShrink(s) {
+			continue
+		}
+		d, err := datastore.New(ctx, s, datastore.Root(c.Root()), datastore.Report(r))
+		if err != nil {
+			return err
+		}
+		log.Printf("Storing report to %s", s)
+		if err := d.StoreReport(ctx, r); err != nil {
+			return err
+		}
+	}
+	log.Println("Shrink report data")
+	if r.Coverage != nil {
+		r.Coverage.DeleteBlockCoverages()
+	}
+	if r.CodeToTestRatio != nil {
+		r.CodeToTestRatio.DeleteFiles()
+	}
+	for _, s := range datastores {
+		if !datastore.NeedToShrink(s) {
+			continue
+		}
+		d, err := datastore.New(ctx, s, datastore.Root(c.Root()), datastore.Report(r))
+		if err != nil {
+			return err
+		}
+		log.Printf("Storing report to %s", s)
+		if err := d.StoreReport(ctx, r); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func badgeFile(path string) (*os.File, error) {
+	err := os.MkdirAll(filepath.Dir(path), 0755) // #nosec
+	if err != nil {
+		return nil, err
+	}
+	out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644) // #nosec
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func Execute() {

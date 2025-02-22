@@ -2,16 +2,17 @@
 <img src="https://github.com/k1LoW/octocov/raw/main/docs/logo.png" width="200" alt="octocov">
 </p>
 
-[![build](https://github.com/k1LoW/octocov/actions/workflows/ci.yml/badge.svg)](https://github.com/k1LoW/octocov/actions) ![coverage](docs/coverage.svg) ![ratio](docs/ratio.svg) ![time](docs/time.svg)
+![Coverage](https://raw.githubusercontent.com/k1LoW/octocovs/main/badges/k1LoW/octocov/coverage.svg) ![Code to Test Ratio](https://raw.githubusercontent.com/k1LoW/octocovs/main/badges/k1LoW/octocov/ratio.svg) ![Test Execution Time](https://raw.githubusercontent.com/k1LoW/octocovs/main/badges/k1LoW/octocov/time.svg) [![build](https://github.com/k1LoW/octocov/actions/workflows/ci.yml/badge.svg)](https://github.com/k1LoW/octocov/actions/workflows/ci.yml)
 
-`octocov` is a toolkit for collecting code metrics (code coverage, code to test ratio and test execution time).
+`octocov` is a toolkit for collecting code metrics (code coverage, code to test ratio, test execution time and **[your own custom metrics](#custom-metrics)**).
 
 Key features of `octocov` are:
 
+- **Useful both [as a CI tool](#on-github-actions) and [as a CLI tool](#on-terminal)**
 - **[Support multiple coverage report formats](#supported-coverage-report-formats).**
 - **[Support multiple code metrics](#supported-code-metrics).**
-- **[Support for even generating coverage report badge](#generate-coverage-report-badge-self).**
-- **[Have a mechanism to aggregate reports from multiple repositories](#store-report-to-central-datastore).**
+- **[Support for even generating coverage report badges](#generate-report-badges-self).**
+- **[Have a mechanism to aggregate reports from multiple repositories](#store-report-to-datastores).**
 
 ## Getting Started
 
@@ -26,21 +27,12 @@ For example, in case of Go language, add `-coverprofile=coverage.out` option as 
 ``` console
 $ go test ./... -coverprofile=coverage.out
 ```
-Add `.octocov.yml` ( or `octocov.yml` ) file to your repository.
 
-``` yaml
-# .octocov.yml
-coverage:
-  paths:
-    - coverage.out
-codeToTestRatio:
-  code:
-    - '**/*.go'
-    - '!**/*_test.go'
-  test:
-    - '**/*_test.go'
-comment:
-  enable: true
+And generete `.octocov.yml` to your repository.
+
+``` console
+$ octocov init
+.octocov.yml is generated
 ```
 
 And set up a workflow file as follows and run octocov on GitHub Actions.
@@ -57,23 +49,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       -
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       -
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
-          go-version: 1.17
+          go-version-file: go.mod
       -
         name: Run tests with coverage report output
         run: go test ./... -coverprofile=coverage.out
       -
-        uses: k1LoW/octocov-action@v0
+        uses: k1LoW/octocov-action@v1
 ```
 
 Then, octocov comment the report of the code metrics to the pull request.
 
-![comment](docs/comment.png)
+![comment](docs/comment_with_diff.png)
 
-**Notice:** Note that only pull requests from the same repository can be commented on. This is because the workflow token of a forked pull request does not have write permission.
+It is also possible to add reports to [GitHub Actions Job Summaries](https://github.blog/2022-05-09-supercharging-github-actions-with-job-summaries/) by editing .octocov.yml.
+
+![summary](docs/summary.png)
+
+It can also be inserted into the body of a pull request.
+
+![body](docs/body.png)
+
+> **Note** that only pull requests from the same repository can be commented on (Reporting to GitHub Actions Job Summaries is permitted). This is because the workflow token of a forked pull request does not have write permission.
 
 ### On Terminal
 
@@ -100,7 +100,6 @@ By setting `comment:`, [comment the reports to pull request](https://github.com/
 ``` yaml
 # .octocov.yml
 comment:
-  enable: true
   hideFooterLink: false # hide octocov link
 ```
 
@@ -110,7 +109,6 @@ If you want to measure **"Code to Test Ratio"**, set `codeToTestRatio:`.
 
 ``` yaml
 comment:
-  enable: true
 codeToTestRatio:
   code:
     - '**/*.go'
@@ -119,14 +117,16 @@ codeToTestRatio:
     - '**/*_test.go'
 ```
 
-By setting `diff:` ( `diff.path:`  or `diff.datastores` ) additionally, it is possible to show differences from previous reports as well.
+By setting `report:` ( `report.path:`  or `report.datastores` ) and `diff:` ( `diff.path:`  or `diff.datastores` ) additionally, it is possible to show differences from previous reports as well.
 
 ``` yaml
 comment:
-  enable: true
+report:
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
 diff:
   datastores:
-    - s3://bucket/reports
+    - artifact://${GITHUB_REPOSITORY}
 ```
 
 ![img](docs/comment_with_diff.png)
@@ -213,10 +213,10 @@ You can display the coverage badge without external communication by setting a l
 ``` markdown
 # mytool
 
-![coverage](docs/coverage.svg)
+![coverage](docs/coverage.svg) ![coverage](docs/ratio.svg) ![coverage](docs/time.svg)
 ```
 
-![coverage](docs/coverage.svg)
+![coverage](docs/coverage.svg) ![coverage](docs/ratio.svg) ![coverage](docs/time.svg)
 
 ### Push report badges self.
 
@@ -228,7 +228,6 @@ coverage:
   badge:
     path: docs/coverage.svg
 push:
-  enable: true
 ```
 
 ### Store report to datastores
@@ -252,8 +251,9 @@ report:
 #### Supported datastores
 
 - GitHub repository
-- S3
-- GCS
+- GitHub Actions Artifacts
+- Amazon S3
+- Google Cloud Storage (GCS)
 - BigQuery
 - Local
 
@@ -264,20 +264,22 @@ By enabling `central:`, `octocov` acts as a central repository for collecting re
 ``` yaml
 # .octocov.yml for central mode
 central:
-  enable: true
-  root:                    .             # root directory or index file path of collected coverage reports pages. default: .
+  root: .                                  # root directory or index file path of collected coverage reports pages. default: .
   reports:
-    - bq://my-project/my-dataset/reports # datastore paths (URLs) where reports are stored. default: local://reports
-  badges: badges                         # directory where badges are generated. default: badges
-  push:
-    enable: true                         # enable self git push
+    datastores:
+      - bq://my-project/my-dataset/reports # datastore paths (URLs) where reports are stored. default: local://reports
+  badges:
+    datastores:
+      - local://badges                     # directory where badges are generated.
+  push:                                    # enable self git push
 ```
 
 #### Supported datastores
 
 - GitHub repository
-- S3
-- GCS
+- GitHub Actions Artifacts
+- Amazon S3
+- Google Cloud Storage (GCS)
 - BigQuery
 - Local
 
@@ -305,6 +307,14 @@ In case of monorepo, code metrics can be reported to datastore separately by spe
 repository: k1LoW/octocov
 ```
 
+### `timeout:`
+
+Timeout for octocov execution. (default: `30sec`)
+
+``` yaml
+timeout: 5min
+```
+
 ### `coverage:`
 
 Configuration for code coverage.
@@ -323,6 +333,17 @@ If no path is specified, the default path for each coverage format will be scann
 coverage:
   paths:
     - tests/coverage.xml
+```
+
+### `coverage.exclude:`
+
+Exclude files from the coverage report.
+
+``` yaml
+coverage:
+  exclude:
+    - 'cmd/*.ts'
+    - 'proto/**/*.pb.ts'
 ```
 
 ### `coverage.acceptable:`
@@ -366,6 +387,15 @@ The path to the badge.
 coverage:
   badge:
     path: docs/coverage.svg
+```
+
+### `coverage.if:`
+
+Conditions for measuring code coverage.
+
+``` yaml
+coverage:
+  if: is_default_branch
 ```
 
 ### `codeToTestRatio:`
@@ -428,6 +458,15 @@ codeToTestRatio:
     path: docs/ratio.svg
 ```
 
+### `codeToTestRatio.if:`
+
+Conditions for measuring code to test ratio.
+
+``` yaml
+codeToTestRatio:
+  if: is_default_branch
+```
+
 ### `testExecutionTime:`
 
 Configuration for test execution time.
@@ -461,6 +500,19 @@ It is also possible to omit the expression as follows
 | `1min` | `current <= 1min` |
 | `< 1min` | `current < 1min` |
 
+### `testExecutionTime.steps`
+
+The name of the step to measure the execution time.
+
+``` yaml
+testExecutionTime:
+  steps:
+    - Run test
+    - Run slow test
+```
+
+If not specified, the step where the coverage report file is generated is used as the measurement target.
+
 ### `testExecutionTime.badge`
 
 Set this if want to generate the badge self.
@@ -475,38 +527,44 @@ testExecutionTime:
     path: docs/time.svg
 ```
 
-### `push:`
+### `testExecutionTime.if:`
 
-Configuration for `git push` badges self.
-
-### `push.enable:`
-
-Enable / disable `git push`
+Conditions for measuring test execution time.
 
 ``` yaml
+testExecutionTime:
+  if: is_pull_request
+```
+
+### `push:`
+
+Configuration for `git push` files self.
+
+### `push.if:`
+
+Conditions for pushing files.
+
+``` yaml
+# .octocov.yml
 push:
-  enable: false
+  if: is_default_branch
+```
+
+The variables available in the `if` section are [here](https://github.com/k1LoW/octocov#if).
+
+### `push.message:`
+
+message for commit.
+
+``` yaml
+# .octocov.yml
+push:
+  message: Update by octocov [skip ci]
 ```
 
 ### `comment:`
 
 Set this if want to comment report to pull request
-
-### `comment.enable:`
-
-Enable / disable comment.
-
-``` yaml
-comment:
-  enable: true
-```
-
-`enable: true` can be omitted if any other parameters are set as follows.
-
-``` yaml
-comment:
-  hideFooterLink: true
-```
 
 ### `comment.hideFooterLink:`
 
@@ -517,6 +575,15 @@ comment:
   hideFooterLink: true
 ```
 
+### `comment.deletePrevious:`
+
+Delete previous code metrics report comments instead of hiding them
+
+``` yaml
+comment:
+  deletePrevious: true
+```
+
 ### `comment.if:`
 
 Conditions for commenting report.
@@ -524,8 +591,60 @@ Conditions for commenting report.
 ``` yaml
 # .octocov.yml
 comment:
-  if: github.event_name == 'pull_request'
+  if: is_pull_request
 ```
+
+The variables available in the `if` section are [here](https://github.com/k1LoW/octocov#if).
+
+### `summary:`
+
+Set this if want to add report to [job summary page](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary).
+
+### `summary.hideFooterLink:`
+
+Hide footer [octocov](https://github.com/k1LoW/octocov) link.
+
+``` yaml
+summary:
+  hideFooterLink: true
+```
+
+### `summary.if:`
+
+Conditions for adding report to job summary page.
+
+``` yaml
+# .octocov.yml
+summary:
+  if: true
+```
+
+The variables available in the `if` section are [here](https://github.com/k1LoW/octocov#if).
+
+### `body:`
+
+Set this if want to insert report to body of pull request.
+
+### `body.hideFooterLink:`
+
+Hide footer [octocov](https://github.com/k1LoW/octocov) link.
+
+``` yaml
+body:
+  hideFooterLink: true
+```
+
+### `body.if:`
+
+Conditions for inserting report body of pull request.
+
+``` yaml
+# .octocov.yml
+body:
+  if: is_pull_request
+```
+
+The variables available in the `if` section are [here](https://github.com/k1LoW/octocov#if).
 
 ### `diff:`
 
@@ -562,10 +681,12 @@ Conditions for comparing reports
 
 ``` yaml
 # .octocov.yml
-report:
-  if: github.event_name == 'pull_request'
+diff:
+  if: is_pull_request
   path: path/to/report.json
 ```
+
+The variables available in the `if` section are [here](https://github.com/k1LoW/octocov#if).
 
 ### `report:`
 
@@ -582,7 +703,7 @@ report:
 
 ### `report.datastores:`
 
-Datastores where the reports are saved.
+Datastores where the reports are stored.
 
 ``` yaml
 report:
@@ -605,7 +726,27 @@ github://[owner]/[repo]@[branch]/[prefix]
 - `GITHUB_REPOSITORY` or `OCTOCOV_GITHUB_REPOSITORY`
 - `GITHUB_API_URL` or `OCTOCOV_GITHUB_API_URL` (optional)
 
-#### S3
+#### GitHub Actions Artifacts
+
+Use `artifact://` or `artifacts://` scheme.
+
+```
+artifact://[owner]/[repo]/[artifactName]
+```
+
+- `artifact://[owner]/[repo]/[artifactName]`
+- `artifact://[owner]/[repo]` ( default artifactName: `octocov-report` )
+
+
+> **Note** that reporting to the artifact can only be sent from the GitHub Actions of the same repository.
+
+**Required environment variables:**
+
+- `GITHUB_TOKEN` or `OCTOCOV_GITHUB_TOKEN`
+- `GITHUB_REPOSITORY` or `OCTOCOV_GITHUB_REPOSITORY`
+- `GITHUB_API_URL` or `OCTOCOV_GITHUB_API_URL` (optional)
+
+#### Amazon S3
 
 Use `s3://` scheme.
 
@@ -623,7 +764,7 @@ s3://[bucket]/[prefix]
 - `AWS_SECRET_ACCESS_KEY` or `OCTOCOV_AWS_SECRET_ACCESS_KEY`
 - `AWS_SESSION_TOKEN` or `OCTOCOV_AWS_SESSION_TOKEN` (optional)
 
-#### GCS
+#### Google Cloud Storage
 
 Use `gs://` scheme.
 
@@ -668,6 +809,25 @@ If you want to create a table, execute the following command ( require `bigquery
 $ octocov migrate-bq-table
 ```
 
+#### Mackerel
+
+> **Note**: Only works with `report.datastores` or `central.reReport.datastores`
+
+Use `mackerel://` or `mkr://` scheme.
+
+```
+mackerel://[Service Name]
+```
+
+**Required permission:**
+
+- `read`
+- `write`
+
+**Required environment variables:**
+
+- `MACKEREL_API_KEY` or `OCTOCOV_MACKEREL_API_KEY`
+
 #### Local
 
 Use `local://` or `file://` scheme.
@@ -681,13 +841,13 @@ local://[path]
 If the absolute path of `.octocov.yml` is `/path/to/.octocov.yml`
 
 - `local://reports` ... `/path/to/reports` directory
-- `local://.reports` ... `/path/to/reports` directory
+- `local://./reports` ... `/path/to/reports` directory
 - `local://../reports` ... `/path/reports` directory
 - `local:///reports` ... `/reports` directory.
 
 ### `report.if:`
 
-Conditions for saving a report.
+Conditions for storing a report.
 
 ``` yaml
 # .octocov.yml
@@ -696,6 +856,12 @@ report:
   datastores:
     - github://owner/coverages/reports
 ```
+
+The variables available in the `if` section are [here](https://github.com/k1LoW/octocov#if).
+
+### `*.if:`
+
+> **Note**: It supports [expr-lang/expr](https://github.com/expr-lang/expr) expressions.
 
 The variables available in the `if` section are as follows
 
@@ -710,31 +876,13 @@ The variables available in the `if` section are as follows
 | `github.event` | `object` | Detailed data for each event of GitHub Actions (ex. `github.event.action`, `github.event.label.name` ) |
 | `env.<env_name>` | `string` | The value of a specific environment variable |
 | `is_pull_request` | `boolean` | Whether the job is related to an pull request (ex. a job fired by `on.push` will be true if it is related to a pull request) |
+| `is_draft` | `boolean` | Whether the job is related to a draft pull request |
+| `labels` | `array` | Labels that are set for the pull request |
 | `is_default_branch` | `boolean` | Whether the job is related to default branch of repository |
 
 ### `central:`
 
-### `central.enable:`
-
-Enable / disable central mode.
-
-``` yaml
-central:
-  enable: false
-```
-
-`enable: true` can be omitted if any other parameters are set as follows.
-
-``` yaml
-central:
-  reports:
-    datastores:
-      - local://reports
-      - gs://my-gcs-bucket/reports
-```
-
-:NOTICE: When central mode is enabled, other functions are automatically turned off.
-
+> **Note**: When central mode is enabled, other functions are automatically turned off.
 
 ### `central.root:`
 
@@ -759,6 +907,35 @@ central:
       - gs://my-gcs-bucket/reports
 ```
 
+#### Use GitHub Actions Artifacts as datastore
+
+When using [GitHub Actions Artifacts](https://docs.github.com/en/rest/actions/artifacts) as a datastore, perform badge generation via on.schedule.
+
+![github](docs/artifacts.svg)
+
+``` yaml
+# .octocov.yml
+report:
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
+```
+
+``` yaml
+# .octocov.yml for central repo
+central:
+  reports:
+    datastores:
+      - artifact://owner/repo
+      - artifact://owner/other-repo
+      - artifact://owner/another-repo
+      [...]
+  push:
+```
+
+[Code metrics and badges of my open source projects using octocov central mode is here](https://github.com/k1LoW/octocovs).
+
+[Template repositoty is here](https://github.com/k1LoW/octocovs-template).
+
 #### Use GitHub repository as datastore
 
 When using the central repository as a datastore, perform badge generation via on.push.
@@ -779,7 +956,6 @@ central:
     datastores:
       - github://owner/central-repo/reports
   push:
-    enable: true
 ```
 
 or
@@ -791,10 +967,9 @@ central:
     datastores:
       - local://reports
   push:
-    enable: true
 ```
 
-#### Use S3 bucket as datastore
+#### Use Amazon S3 bucket as datastore
 
 When using the S3 bucket as a datastore, perform badge generation via on.schedule.
 
@@ -814,7 +989,6 @@ central:
     datastores:
       - s3://my-s3-bucket/reports
   push:
-    enable: true
 ```
 
 **Required permission (Central Repo):**
@@ -848,7 +1022,6 @@ central:
     datastores:
       - gs://my-gcs-bucket/reports
   push:
-    enable: true
 ```
 
 **Required permission (Central Repo):**
@@ -881,7 +1054,6 @@ central:
     datastores:
       - bq://my-project/my-dataset/reports
   push:
-    enable: true
 ```
 
 **Required permission (Central Repo):**
@@ -911,15 +1083,6 @@ central:
 
 Configuration for `git push` index file and badges self.
 
-### `central.push.enable:`
-
-Enable / disable `git push`
-
-``` yaml
-push:
-  enable: true
-```
-
 ### `central.if:`
 
 Conditions for central mode.
@@ -932,6 +1095,20 @@ central:
     datastores:
       - s3://my-s3-bucket/reports
 ```
+
+The variables available in the `if` section are [here](https://github.com/k1LoW/octocov#if).
+
+### `central.reReport:`
+
+Store collected reports in yet another datastores.
+
+### `central.reReport.if:`
+
+Conditions for re storing reports.
+
+### `central.reReport.datastores:`
+
+Datastores where the reports are re-stored.
 
 ## Supported coverage report formats
 
@@ -969,21 +1146,52 @@ Support `SF` `DA` only
 
 **Default path:** `coverage.xml`
 
+### JaCoCo
+
+**Default path:** `build/reports/jacoco/test/jacocoTestReport.xml`
+
 ## Supported code metrics
 
 - **Code Coverage**
 - **Code to Test Ratio**
 - **Test Execution Time** (on GitHub Actions only)
 
+### Custom metrics
+
+![custom_metrics](docs/custom_metrics.png)
+
+octocov accepts custom metrics in addition to the three supporting metrics.
+
+Specify the path to the custom metrics JSON file in an environment variable prefixed with `OCTOCOV_CUSTOM_METRICS_` to collect the code metrics at the same time.
+
+The JSON schema for custom metrics can be found [here](report/custom_metrics_schema.json).
+
+If there are multiple custom metrics JSON files, specify each file path in a separate environment variable (example [here](https://github.com/k1LoW/octocov/blob/68e007b4164ad6dab4ad978bce8e88c21280900a/.github/workflows/ci.yml#L59-L60)) or [combine the JSONs that satisfy the JSON schema into an array](testdata/custom_metrics/benchmark_0_1.json).
+
+## Detecting pull request number
+
+octocov detect pull request number following order.
+
+1. Get pull request number from `GITHUB_PULL_REQUEST_NUMBER` or `OCTOCOV_GITHUB_PULL_REQUEST_NUMBER`.
+2. Get pull request number from [`GITHUB_REF`](https://docs.github.com/en/actions/learn-github-actions/variables) ( e.g. `refs/pull/1/merge` ).
+3. Get branch name from [`GITHUB_REF`](https://docs.github.com/en/actions/learn-github-actions/variables) ( e.g. `refs/heads/branch/branch/name` ) and detect pull request number using GitHub API.
+
+### Override environment variables
+
+If an environment variable with prefix `OCTOCOV_` is set, it is used as an unprefixed environment variable in octocov.
+
+For example, if `OCTOCOV_GITHUB_REF` is set, it is handled as `GITHUB_REF` in octocov.
+
+This feature allows [environment variables that cannot normally be overridden](https://docs.github.com/en/actions/learn-github-actions/variables#naming-conventions-for-environment-variables) to be changed on octocov.
+
 ## Install
 
 **deb:**
 
-Use [dpkg-i-from-url](https://github.com/k1LoW/dpkg-i-from-url)
-
 ``` console
 $ export OCTOCOV_VERSION=X.X.X
-$ curl -L https://git.io/dpkg-i-from-url | bash -s -- https://github.com/k1LoW/octocov/releases/download/v$OCTOCOV_VERSION/octocov_$OCTOCOV_VERSION-1_amd64.deb
+$ curl -o octocov.deb -L https://github.com/k1LoW/octocov/releases/download/v$OCTOCOV_VERSION/octocov_$OCTOCOV_VERSION-1_amd64.deb
+$ dpkg -i octocov.deb
 ```
 
 **RPM:**
@@ -995,11 +1203,10 @@ $ yum install https://github.com/k1LoW/octocov/releases/download/v$OCTOCOV_VERSI
 
 **apk:**
 
-Use [apk-add-from-url](https://github.com/k1LoW/apk-add-from-url)
-
 ``` console
 $ export OCTOCOV_VERSION=X.X.X
-$ curl -L https://git.io/apk-add-from-url | sh -s -- https://github.com/k1LoW/octocov/releases/download/v$OCTOCOV_VERSION/octocov_$OCTOCOV_VERSION-1_amd64.apk
+$ curl -o octocov.apk -L https://github.com/k1LoW/octocov/releases/download/v$OCTOCOV_VERSION/octocov_$OCTOCOV_VERSION-1_amd64.apk
+$ apk add octocov.apk
 ```
 
 **homebrew tap:**
@@ -1008,9 +1215,21 @@ $ curl -L https://git.io/apk-add-from-url | sh -s -- https://github.com/k1LoW/oc
 $ brew install k1LoW/tap/octocov
 ```
 
+**[aqua](https://aquaproj.github.io/):**
+
+```console
+$ aqua g -i k1LoW/octocov
+```
+
 **manually:**
 
 Download binary from [releases page](https://github.com/k1LoW/octocov/releases)
+
+**go install:**
+
+```console
+$ go install github.com/k1LoW/octocov@latest
+```
 
 **docker:**
 

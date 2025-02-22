@@ -25,13 +25,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/k1LoW/octocov/badge"
 	"github.com/k1LoW/octocov/config"
 	"github.com/k1LoW/octocov/internal"
-	"github.com/k1LoW/octocov/pkg/badge"
 	"github.com/k1LoW/octocov/report"
 	"github.com/spf13/cobra"
 )
@@ -44,12 +45,12 @@ const (
 
 var outPath string
 
-// badgeCmd represents the badge command
+// badgeCmd represents the badge command.
 var badgeCmd = &cobra.Command{
 	Use:       "badge",
 	Short:     "generate badge",
 	Long:      `generate badge.`,
-	Args:      cobra.ExactValidArgs(1),
+	Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 	ValidArgs: []string{badgeCoverage, badgeRatio, badgeTime},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
@@ -85,11 +86,11 @@ var badgeCmd = &cobra.Command{
 			if err := c.CoverageConfigReady(); err != nil {
 				return err
 			}
-			if err := r.MeasureCoverage(c.Coverage.Paths); err != nil {
+			if err := r.MeasureCoverage(c.Coverage.Paths, c.Coverage.Exclude); err != nil {
 				return err
 			}
 			cp := r.CoveragePercent()
-			b := badge.New("coverage", fmt.Sprintf("%.1f%%", cp))
+			b := badge.New("coverage", fmt.Sprintf("%.1f%%", floor1(cp)))
 			b.MessageColor = c.CoverageColor(cp)
 			if err := b.AddIcon(internal.Icon); err != nil {
 				return err
@@ -99,7 +100,7 @@ var badgeCmd = &cobra.Command{
 			}
 		case badgeRatio:
 			if !c.Loaded() {
-				cmd.PrintErrf("%s are not found\n", strings.Join(config.DefaultConfigFilePaths, " and "))
+				cmd.PrintErrf("%s are not found\n", strings.Join(config.DefaultPaths, " and "))
 			}
 			if err := c.CodeToTestRatioConfigReady(); err != nil {
 				return err
@@ -108,7 +109,7 @@ var badgeCmd = &cobra.Command{
 				return err
 			}
 			tr := r.CodeToTestRatioRatio()
-			b := badge.New("code to test ratio", fmt.Sprintf("1:%.1f", tr))
+			b := badge.New("code to test ratio", fmt.Sprintf("1:%.1f", floor1(tr)))
 			b.MessageColor = c.CodeToTestRatioColor(tr)
 			if err := b.AddIcon(internal.Icon); err != nil {
 				return err
@@ -120,7 +121,7 @@ var badgeCmd = &cobra.Command{
 			if err := c.TestExecutionTimeConfigReady(); err != nil {
 				return err
 			}
-			stepNames := []string{}
+			var stepNames []string
 			if len(c.TestExecutionTime.Steps) > 0 {
 				stepNames = c.TestExecutionTime.Steps
 			}
@@ -146,4 +147,9 @@ func init() {
 	rootCmd.AddCommand(badgeCmd)
 	badgeCmd.Flags().StringVarP(&configPath, "config", "", "", "config file path")
 	badgeCmd.Flags().StringVarP(&outPath, "out", "", "", "output file path")
+}
+
+// floor1 round down to one decimal place.
+func floor1(v float64) float64 {
+	return math.Floor(v*10) / 10
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/k1LoW/octocov/internal"
 )
@@ -17,32 +16,26 @@ func (c *Config) Build() {
 
 	// Coverage
 	if c.Coverage == nil {
-		c.Coverage = &ConfigCoverage{}
-	}
-	if c.Coverage.Paths == nil {
-		c.Coverage.Paths = []string{}
+		c.Coverage = &Coverage{}
 	}
 	if c.Coverage.Path != "" {
-		_, _ = fmt.Fprintln(os.Stderr, "Deprecated error: coverage.path: has been deprecated. please use coverage.paths: instead.")
+		_, _ = fmt.Fprintln(os.Stderr, "Deprecated: coverage.path: has been deprecated. please use coverage.paths: instead.") //nostyle:handlerrors
 		c.Coverage.Paths = append(c.Coverage.Paths, c.Coverage.Path)
 	}
 	if len(c.Coverage.Paths) == 0 {
 		c.Coverage.Paths = append(c.Coverage.Paths, filepath.Dir(c.path))
-	}
-
-	// CodeToTestRatio
-	if c.CodeToTestRatio != nil {
-		if c.CodeToTestRatio.Code == nil {
-			c.CodeToTestRatio.Code = []string{}
+	} else {
+		var paths []string
+		for _, p := range c.Coverage.Paths {
+			p = filepath.FromSlash(p)
+			paths = append(paths, filepath.Join(filepath.Dir(c.path), p))
 		}
-		if c.CodeToTestRatio.Test == nil {
-			c.CodeToTestRatio.Test = []string{}
-		}
+		c.Coverage.Paths = paths
 	}
 
 	// TestExecutionTime
 	if c.TestExecutionTime == nil {
-		c.TestExecutionTime = &ConfigTestExecutionTime{}
+		c.TestExecutionTime = &TestExecutionTime{}
 	}
 
 	// Report
@@ -52,7 +45,7 @@ func (c *Config) Build() {
 		if c.Central.Root == "" {
 			c.Central.Root = "."
 		}
-		if !strings.HasPrefix(c.Central.Root, "/") {
+		if !filepath.IsAbs(c.Central.Root) {
 			c.Central.Root = filepath.Clean(filepath.Join(c.Root(), c.Central.Root))
 		}
 		if len(c.Central.Reports.Datastores) == 0 {
@@ -70,6 +63,6 @@ func (c *Config) Build() {
 	// Diff
 
 	// GitRoot
-	gitRoot, _ := internal.GetRootPath(c.Root())
+	gitRoot, _ := internal.RootPath(c.Root()) //nostyle:handlerrors
 	c.GitRoot = gitRoot
 }

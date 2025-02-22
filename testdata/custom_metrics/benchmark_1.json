@@ -1,0 +1,29 @@
+{
+  "key": "benchmark_1",
+  "name": "Benchmark-1 (this is custom metrics test)",
+  "metadata": [
+    {
+      "key": "goos",
+      "name": "GOOS",
+      "value": "darwin"
+    },
+    {
+      "key": "goarch",
+      "name": "GOARCH",
+      "value": "amd64"
+    }
+  ],
+  "metrics": [
+    {
+      "key": "N",
+      "name": "Number of iterations",
+      "value": 1500
+    },
+    {
+      "key": "NsPerOp",
+      "name": "Nanoseconds per iteration",
+      "value": 1345,
+      "unit": " ns/op"
+    }
+  ]
+}

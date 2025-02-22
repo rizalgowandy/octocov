@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -10,17 +11,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antonmedv/expr"
+	"github.com/expr-lang/expr"
 	"github.com/goccy/go-yaml"
 	"github.com/hashicorp/go-multierror"
 	"github.com/k1LoW/duration"
 	"github.com/k1LoW/expand"
 	"github.com/k1LoW/octocov/gh"
-	"github.com/k1LoW/octocov/report"
+	"golang.org/x/text/language"
 )
 
 const defaultBadgesDatastore = "local://reports"
 const defaultReportsDatastore = "local://reports"
+const defaultTimeout = "30sec"
 const largeEnoughTime = float64(99 * time.Hour)
 
 const (
@@ -32,19 +34,23 @@ const (
 	red         = "#E05D44"
 )
 
-var DefaultConfigFilePaths = []string{".octocov.yml", "octocov.yml"}
+var DefaultPaths = []string{".octocov.yml", "octocov.yml"}
 
 type Config struct {
-	Repository        string                   `yaml:"repository"`
-	Coverage          *ConfigCoverage          `yaml:"coverage"`
-	CodeToTestRatio   *ConfigCodeToTestRatio   `yaml:"codeToTestRatio,omitempty"`
-	TestExecutionTime *ConfigTestExecutionTime `yaml:"testExecutionTime,omitempty"`
-	Report            *ConfigReport            `yaml:"report,omitempty"`
-	Central           *ConfigCentral           `yaml:"central,omitempty"`
-	Push              *ConfigPush              `yaml:"push,omitempty"`
-	Comment           *ConfigComment           `yaml:"comment,omitempty"`
-	Diff              *ConfigDiff              `yaml:"diff,omitempty"`
-	GitRoot           string                   `yaml:"-"`
+	Repository        string             `yaml:"repository"`
+	Coverage          *Coverage          `yaml:"coverage"`
+	CodeToTestRatio   *CodeToTestRatio   `yaml:"codeToTestRatio,omitempty"`
+	TestExecutionTime *TestExecutionTime `yaml:"testExecutionTime,omitempty"`
+	Report            *Report            `yaml:"report,omitempty"`
+	Central           *Central           `yaml:"central,omitempty"`
+	Push              *Push              `yaml:"push,omitempty"`
+	Comment           *Comment           `yaml:"comment,omitempty"`
+	Summary           *Summary           `yaml:"summary,omitempty"`
+	Body              *Body              `yaml:"body,omitempty"`
+	Diff              *Diff              `yaml:"diff,omitempty"`
+	Timeout           time.Duration      `yaml:"timeout,omitempty"`
+	Locale            *language.Tag      `yaml:"locale,omitempty"`
+	GitRoot           string             `yaml:"-"`
 	// working directory
 	wd string
 	// config file path
@@ -52,80 +58,94 @@ type Config struct {
 	gh   *gh.Gh
 }
 
-type ConfigCoverage struct {
-	Path       string              `yaml:"path,omitempty"`
-	Paths      []string            `yaml:"paths,omitempty"`
-	Badge      ConfigCoverageBadge `yaml:"badge,omitempty"`
-	Acceptable string              `yaml:"acceptable,omitempty"`
+type Coverage struct {
+	Path       string        `yaml:"path,omitempty"`
+	Paths      []string      `yaml:"paths,omitempty"`
+	Exclude    []string      `yaml:"exclude,omitempty"`
+	Badge      CoverageBadge `yaml:"badge,omitempty"`
+	Acceptable string        `yaml:"acceptable,omitempty"`
+	If         string        `yaml:"if,omitempty"`
 }
 
-type ConfigCoverageBadge struct {
+type CoverageBadge struct {
 	Path string `yaml:"path,omitempty"`
 }
 
-type ConfigCodeToTestRatio struct {
-	Code       []string                   `yaml:"code"`
-	Test       []string                   `yaml:"test"`
-	Badge      ConfigCodeToTestRatioBadge `yaml:"badge,omitempty"`
-	Acceptable string                     `yaml:"acceptable,omitempty"`
+type CodeToTestRatio struct {
+	Code       []string             `yaml:"code"`
+	Test       []string             `yaml:"test"`
+	Badge      CodeToTestRatioBadge `yaml:"badge,omitempty"`
+	Acceptable string               `yaml:"acceptable,omitempty"`
+	If         string               `yaml:"if,omitempty"`
 }
 
-type ConfigCodeToTestRatioBadge struct {
+type CodeToTestRatioBadge struct {
 	Path string `yaml:"path,omitempty"`
 }
 
-type ConfigTestExecutionTime struct {
-	Badge      ConfigTestExecutionTimeBadge `yaml:"badge,omitempty"`
-	Acceptable string                       `yaml:"acceptable,omitempty"`
-	Steps      []string                     `yaml:"steps,omitempty"`
+type TestExecutionTime struct {
+	Badge      TestExecutionTimeBadge `yaml:"badge,omitempty"`
+	Acceptable string                 `yaml:"acceptable,omitempty"`
+	Steps      []string               `yaml:"steps,omitempty"`
+	If         string                 `yaml:"if,omitempty"`
 }
 
-type ConfigTestExecutionTimeBadge struct {
+type TestExecutionTimeBadge struct {
 	Path string `yaml:"path,omitempty"`
 }
 
-type ConfigCentral struct {
-	Enable  *bool                `yaml:"enable,omitempty"`
-	Root    string               `yaml:"root"`
-	Reports ConfigCentralReports `yaml:"reports"`
-	Badges  ConfigCentralBadges  `yaml:"badges"`
-	Push    *ConfigPush          `yaml:"push"`
-	If      string               `yaml:"if,omitempty"`
+type Central struct {
+	Root     string         `yaml:"root"`
+	Reports  CentralReports `yaml:"reports"`
+	Badges   CentralBadges  `yaml:"badges"`
+	Push     *Push          `yaml:"push,omitempty"`
+	ReReport *Report        `yaml:"reReport,omitempty"`
+	If       string         `yaml:"if,omitempty"`
 }
 
-type ConfigCentralReports struct {
+type CentralReports struct {
 	Datastores []string `yaml:"datastores"`
 }
 
-type ConfigCentralBadges struct {
+type CentralBadges struct {
 	Datastores []string `yaml:"datastores"`
 }
 
-type ConfigPush struct {
-	Enable *bool  `yaml:"enable,omitempty"`
-	If     string `yaml:"if,omitempty"`
+type Push struct {
+	If      string `yaml:"if,omitempty"`
+	Message string `yaml:"message,omitempty"`
 }
 
-type ConfigComment struct {
-	Enable         *bool  `yaml:"enable,omitempty"`
+type Comment struct {
+	HideFooterLink bool   `yaml:"hideFooterLink"`
+	DeletePrevious bool   `yaml:"deletePrevious"`
+	If             string `yaml:"if,omitempty"`
+}
+
+type Summary struct {
 	HideFooterLink bool   `yaml:"hideFooterLink"`
 	If             string `yaml:"if,omitempty"`
 }
 
-type ConfigDiff struct {
+type Body struct {
+	HideFooterLink bool   `yaml:"hideFooterLink"`
+	If             string `yaml:"if,omitempty"`
+}
+
+type Diff struct {
 	Path       string   `yaml:"path,omitempty"`
 	Datastores []string `yaml:"datastores,omitempty"`
 	If         string   `yaml:"if,omitempty"`
 }
 
 func New() *Config {
-	wd, _ := os.Getwd()
+	wd, _ := os.Getwd() //nostyle:handlerrors
 	return &Config{
 		wd: wd,
 	}
 }
 
-func (c *Config) Getwd() string {
+func (c *Config) Wd() string {
 	return c.wd
 }
 
@@ -134,8 +154,9 @@ func (c *Config) Setwd(path string) {
 }
 
 func (c *Config) Load(path string) error {
+	path = filepath.FromSlash(path)
 	if path == "" {
-		for _, p := range DefaultConfigFilePaths {
+		for _, p := range DefaultPaths {
 			if f, err := os.Stat(filepath.Join(c.wd, p)); err == nil && !f.IsDir() {
 				if path != "" {
 					return fmt.Errorf("duplicate config file [%s, %s]", path, p)
@@ -147,7 +168,11 @@ func (c *Config) Load(path string) error {
 	if path == "" {
 		return nil
 	}
-	c.path = filepath.Join(c.wd, path)
+	if filepath.IsAbs(path) {
+		c.path = path
+	} else {
+		c.path = filepath.Join(c.wd, path)
+	}
 	buf, err := os.ReadFile(filepath.Clean(c.path))
 	if err != nil {
 		return err
@@ -169,23 +194,24 @@ func (c *Config) Loaded() bool {
 	return c.path != ""
 }
 
-func (c *Config) Acceptable(r, rPrev *report.Report) error {
+type Reporter interface {
+	CoveragePercent() float64
+	CodeToTestRatioRatio() float64
+	TestExecutionTimeNano() float64
+	IsMeasuredTestExecutionTime() bool
+}
+
+func (c *Config) Acceptable(r, rPrev Reporter) error {
 	var result *multierror.Error
 	if err := c.CoverageConfigReady(); err == nil {
-		prev := 0.0
-		if rPrev != nil {
-			prev = rPrev.CoveragePercent()
-		}
+		prev := rPrev.CoveragePercent()
 		if err := coverageAcceptable(r.CoveragePercent(), prev, c.Coverage.Acceptable); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
 
 	if err := c.CodeToTestRatioConfigReady(); err == nil {
-		prev := 0.0
-		if rPrev != nil {
-			prev = rPrev.CodeToTestRatioRatio()
-		}
+		prev := rPrev.CodeToTestRatioRatio()
 		if err := codeToTestRatioAcceptable(r.CodeToTestRatioRatio(), prev, c.CodeToTestRatio.Acceptable); err != nil {
 			result = multierror.Append(result, err)
 		}
@@ -193,10 +219,8 @@ func (c *Config) Acceptable(r, rPrev *report.Report) error {
 
 	if err := c.TestExecutionTimeConfigReady(); err == nil {
 		prev := largeEnoughTime
-		if rPrev != nil {
-			if rPrev.IsMeasuredTestExecutionTime() {
-				prev = rPrev.TestExecutionTimeNano()
-			}
+		if rPrev.IsMeasuredTestExecutionTime() {
+			prev = rPrev.TestExecutionTimeNano()
 		}
 
 		if err := testExecutionTimeAcceptable(r.TestExecutionTimeNano(), prev, c.TestExecutionTime.Acceptable); err != nil {
@@ -230,7 +254,7 @@ func coverageAcceptable(current, prev float64, cond string) error {
 		cond = fmt.Sprintf("current %s", cond)
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"current": current,
 		"prev":    prev,
 		"diff":    current - prev,
@@ -240,8 +264,12 @@ func coverageAcceptable(current, prev float64, cond string) error {
 		return err
 	}
 
-	if !ok.(bool) {
-		return fmt.Errorf("code coverage is %.1f%%. the condition in the `coverage.acceptable:` section is not met (`%s`)", current, org)
+	tf, okk := ok.(bool)
+	if !okk {
+		return fmt.Errorf("invalid condition `%s`", cond)
+	}
+	if !tf {
+		return fmt.Errorf("code coverage is %.1f%%. the condition in the `coverage.acceptable:` section is not met (`%s`)", floor1(current), org)
 	}
 	return nil
 }
@@ -260,7 +288,7 @@ func codeToTestRatioAcceptable(current, prev float64, cond string) error {
 		cond = fmt.Sprintf("current %s", cond)
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"current": current,
 		"prev":    prev,
 		"diff":    current - prev,
@@ -269,9 +297,12 @@ func codeToTestRatioAcceptable(current, prev float64, cond string) error {
 	if err != nil {
 		return err
 	}
-
-	if !ok.(bool) {
-		return fmt.Errorf("code to test ratio is 1:%.1f. the condition in the `codeToTestRatio.acceptable:` section is not met (`%s`)", current, org)
+	tf, okk := ok.(bool)
+	if !okk {
+		return fmt.Errorf("invalid condition `%s`", cond)
+	}
+	if !tf {
+		return fmt.Errorf("code to test ratio is 1:%.1f. the condition in the `codeToTestRatio.acceptable:` section is not met (`%s`)", floor1(current), org)
 	}
 	return nil
 }
@@ -296,7 +327,7 @@ func testExecutionTimeAcceptable(current, prev float64, cond string) error {
 		cond = fmt.Sprintf("current %s", cond)
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"current": current,
 		"prev":    prev,
 		"diff":    current - prev,
@@ -306,7 +337,11 @@ func testExecutionTimeAcceptable(current, prev float64, cond string) error {
 		return err
 	}
 
-	if !ok.(bool) {
+	tf, okk := ok.(bool)
+	if !okk {
+		return fmt.Errorf("invalid condition `%s`", cond)
+	}
+	if !tf {
 		return fmt.Errorf("test execution time is %v. the condition in the `testExecutionTime.acceptable:` section is not met (`%s`)", time.Duration(current), org)
 	}
 	return nil
@@ -380,7 +415,7 @@ func (c *Config) CheckIf(cond string) (bool, error) {
 		}
 		c.gh = g
 	}
-	defaultBranch, err := c.gh.GetDefaultBranch(ctx, repo.Owner, repo.Repo)
+	defaultBranch, err := c.gh.FetchDefaultBranch(ctx, repo.Owner, repo.Repo)
 	if err != nil {
 		return false, err
 	}
@@ -392,29 +427,43 @@ func (c *Config) CheckIf(cond string) (bool, error) {
 	}
 
 	isPullRequest := false
-	if _, err := c.gh.DetectCurrentPullRequestNumber(ctx, repo.Owner, repo.Repo); err == nil {
+	isDraft := false
+	var labels []string
+	if n, err := c.gh.DetectCurrentPullRequestNumber(ctx, repo.Owner, repo.Repo); err == nil {
 		isPullRequest = true
+		pr, err := c.gh.FetchPullRequest(ctx, repo.Owner, repo.Repo, n)
+		if err != nil {
+			return false, err
+		}
+		isDraft = pr.IsDraft
+		labels = pr.Labels
 	}
 	now := time.Now()
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"year":    now.UTC().Year(),
 		"month":   now.UTC().Month(),
 		"day":     now.UTC().Day(),
 		"hour":    now.UTC().Hour(),
 		"weekday": int(now.UTC().Weekday()),
-		"github": map[string]interface{}{
+		"github": map[string]any{
 			"event_name": e.Name,
 			"event":      e.Payload,
 		},
 		"env":               envMap(),
 		"is_default_branch": isDefaultBranch,
 		"is_pull_request":   isPullRequest,
+		"is_draft":          isDraft,
+		"labels":            labels,
 	}
 	ok, err := expr.Eval(fmt.Sprintf("(%s) == true", cond), variables)
 	if err != nil {
 		return false, err
 	}
-	return ok.(bool), nil
+	tf, okk := ok.(bool)
+	if !okk {
+		return false, fmt.Errorf("invalid condition `%s`", cond)
+	}
+	return tf, nil
 }
 
 func envMap() map[string]string {
@@ -432,4 +481,9 @@ func envMap() map[string]string {
 		m[k] = parts[1]
 	}
 	return m
+}
+
+// floor1 round down to one decimal place.
+func floor1(v float64) float64 {
+	return math.Floor(v*10) / 10
 }

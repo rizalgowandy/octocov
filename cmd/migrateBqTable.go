@@ -35,7 +35,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// migrateBqTableCmd represents the migrateBqTable command
+// migrateBqTableCmd represents the migrateBqTable command.
 var migrateBqTableCmd = &cobra.Command{
 	Use:   "migrate-bq-table",
 	Short: "migrate table of BigQuery dataset for code metrics datastore",
@@ -47,7 +47,7 @@ var migrateBqTableCmd = &cobra.Command{
 			return err
 		}
 		if !c.Loaded() {
-			cmd.PrintErrf("%s are not found\n", strings.Join(config.DefaultConfigFilePaths, " and "))
+			cmd.PrintErrf("%s are not found\n", strings.Join(config.DefaultPaths, " and "))
 		}
 
 		c.Build()
@@ -60,7 +60,7 @@ var migrateBqTableCmd = &cobra.Command{
 			if !strings.HasPrefix(u, "bq://") {
 				continue
 			}
-			d, err := datastore.New(ctx, u, c.Root())
+			d, err := datastore.New(ctx, u, datastore.Root(c.Root()))
 			if err != nil {
 				return err
 			}
@@ -73,11 +73,16 @@ var migrateBqTableCmd = &cobra.Command{
 
 		var merr *multierror.Error
 		for u, d := range datastores {
-			b := d.(*bq.BQ)
+			b, ok := d.(*bq.BQ)
+			if !ok {
+				continue
+			}
 			if err := b.CreateTable(ctx); err != nil {
 				merr = multierror.Append(merr, err)
 			} else {
-				_, _ = fmt.Fprintf(os.Stderr, "%s has been created\n", u)
+				if _, err := fmt.Fprintf(os.Stderr, "%s has been created\n", u); err != nil {
+					merr = multierror.Append(merr, err)
+				}
 			}
 		}
 		return merr
@@ -85,5 +90,6 @@ var migrateBqTableCmd = &cobra.Command{
 }
 
 func init() {
+	migrateBqTableCmd.Flags().StringVarP(&configPath, "config", "", "", "config file path")
 	rootCmd.AddCommand(migrateBqTableCmd)
 }

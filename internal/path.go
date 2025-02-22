@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
-func GetRootPath(base string) (string, error) {
+func RootPath(base string) (string, error) {
 	p, err := filepath.Abs(base)
 	if err != nil {
 		return "", err
@@ -25,7 +26,8 @@ func GetRootPath(base string) (string, error) {
 		if fi, err := os.Stat(gitConfig); err == nil && !fi.IsDir() {
 			return p, nil
 		}
-		if p == "/" {
+		if filepath.Dir(p) == p {
+			// root directory
 			break
 		}
 		p = filepath.Dir(p)
@@ -34,17 +36,16 @@ func GetRootPath(base string) (string, error) {
 }
 
 func DetectPrefix(gitRoot, wd string, files, cfiles []string) string {
-	rcfiles := [][]string{}
+	var rcfiles [][]string
 	for _, f := range cfiles {
-		s := strings.Split(f, "/")
+		s := strings.Split(filepath.FromSlash(f), string(filepath.Separator))
 		reverse(s)
 		rcfiles = append(rcfiles, s)
 	}
 
-	rfiles := [][]string{}
+	var rfiles [][]string
 	for _, f := range files {
-		s := strings.Split(f, "/")
-		// reverse slice
+		s := strings.Split(filepath.FromSlash(f), string(filepath.Separator))
 		reverse(s)
 		rfiles = append(rfiles, s)
 	}
@@ -67,7 +68,7 @@ func DetectPrefix(gitRoot, wd string, files, cfiles []string) string {
 			detect := func(s []string, i, j int) string {
 				// reverse slice
 				reverse(s)
-				suffix := filepath.Join(s...)
+				suffix := join(s...)
 				cfile := cfiles[i]
 				cfp := strings.TrimSuffix(cfile, suffix)
 				file := files[j]
@@ -116,4 +117,12 @@ func reverse(s []string) {
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
 		s[i], s[j] = s[j], s[i]
 	}
+}
+
+func join(elem ...string) string {
+	if runtime.GOOS == "windows" && elem[0][len(elem[0])-1] == ':' {
+		// Allow filepath.join to be an absolute path
+		elem[0] += "\\"
+	}
+	return filepath.Join(elem...)
 }

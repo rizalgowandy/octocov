@@ -1,5 +1,439 @@
 # Changelog
 
+## [v0.63.0](https://github.com/k1LoW/octocov/compare/v0.62.6...v0.63.0) - 2025-02-22
+### Breaking Changes 🛠
+- fix(deps): update goccy/go-yaml by @k1LoW in https://github.com/k1LoW/octocov/pull/460
+### Other Changes
+- chore(deps): update Go version to 1.23.6 in go.mod by @k1LoW in https://github.com/k1LoW/octocov/pull/456
+- chore(deps): bump the dependencies group across 1 directory with 15 updates by @dependabot in https://github.com/k1LoW/octocov/pull/461
+
+## [v0.62.6](https://github.com/k1LoW/octocov/compare/v0.62.5...v0.62.6) - 2025-02-03
+### Other Changes
+- chore: Update go directive version by @k1LoW in https://github.com/k1LoW/octocov/pull/448
+- chore(deps): bump the dependencies group across 1 directory with 12 updates by @dependabot in https://github.com/k1LoW/octocov/pull/450
+
+## [v0.62.5](https://github.com/k1LoW/octocov/compare/v0.62.4...v0.62.5) - 2025-01-12
+### Other Changes
+- Fix lint warn by @k1LoW in https://github.com/k1LoW/octocov/pull/441
+- docs: fix a typo in Readme by @mikatuo in https://github.com/k1LoW/octocov/pull/440
+- Update pkgs by @k1LoW in https://github.com/k1LoW/octocov/pull/444
+
+## [v0.62.4](https://github.com/k1LoW/octocov/compare/v0.62.3...v0.62.4) - 2024-12-19
+### Other Changes
+- Update pkgs by @k1LoW in https://github.com/k1LoW/octocov/pull/433
+- chore(deps): bump the dependencies group across 1 directory with 2 updates by @dependabot in https://github.com/k1LoW/octocov/pull/434
+
+## [v0.62.3](https://github.com/k1LoW/octocov/compare/v0.62.2...v0.62.3) - 2024-11-27
+### Other Changes
+- chore(deps): bump github.com/cli/go-gh/v2 from 2.6.0 to 2.11.1 by @dependabot in https://github.com/k1LoW/octocov/pull/426
+
+## [v0.62.2](https://github.com/k1LoW/octocov/compare/v0.62.1...v0.62.2) - 2024-11-25
+### Other Changes
+- chore(deps): bump the dependencies group across 1 directory with 16 updates by @dependabot in https://github.com/k1LoW/octocov/pull/414
+- chore(deps): bump github.com/golang-jwt/jwt/v4 from 4.5.0 to 4.5.1 by @dependabot in https://github.com/k1LoW/octocov/pull/421
+- chore(deps): bump the dependencies group across 1 directory with 18 updates by @dependabot in https://github.com/k1LoW/octocov/pull/425
+
+## [v0.62.1](https://github.com/k1LoW/octocov/compare/v0.62.0...v0.62.1) - 2024-09-02
+### Other Changes
+- docs(README): use k1LoW/octocov-action@v1 by @azu in https://github.com/k1LoW/octocov/pull/408
+
+## [v0.62.0](https://github.com/k1LoW/octocov/compare/v0.61.1...v0.62.0) - 2024-07-10
+### Breaking Changes 🛠
+- Always count by LOC when merging multiple coverage. by @k1LoW in https://github.com/k1LoW/octocov/pull/395
+### Other Changes
+- Fix lint warn by @k1LoW in https://github.com/k1LoW/octocov/pull/396
+- chore(deps): bump google.golang.org/grpc from 1.64.0 to 1.64.1 by @dependabot in https://github.com/k1LoW/octocov/pull/393
+
+## [v0.61.1](https://github.com/k1LoW/octocov/compare/v0.61.0...v0.61.1) - 2024-07-03
+### Other Changes
+- Update go version by @k1LoW in https://github.com/k1LoW/octocov/pull/389
+
+## [v0.61.0](https://github.com/k1LoW/octocov/compare/v0.60.0...v0.61.0) - 2024-07-02
+### Breaking Changes 🛠
+- Update go-github-actions by @k1LoW in https://github.com/k1LoW/octocov/pull/384
+### New Features 🎉
+- Support wildcard paths in `coverage.paths:` by @k1LoW in https://github.com/k1LoW/octocov/pull/388
+### Other Changes
+- chore(deps): bump the dependencies group with 5 updates by @dependabot in https://github.com/k1LoW/octocov/pull/372
+- chore(deps): bump the dependencies group with 3 updates by @dependabot in https://github.com/k1LoW/octocov/pull/375
+- chore(deps): bump the dependencies group with 10 updates by @dependabot in https://github.com/k1LoW/octocov/pull/377
+- Use goreleaser v2 by @k1LoW in https://github.com/k1LoW/octocov/pull/378
+- chore(deps): bump the dependencies group with 4 updates by @dependabot in https://github.com/k1LoW/octocov/pull/379
+- chore(deps): bump docker/build-push-action from 5 to 6 in the dependencies group by @dependabot in https://github.com/k1LoW/octocov/pull/380
+- chore(deps): bump the dependencies group with 5 updates by @dependabot in https://github.com/k1LoW/octocov/pull/381
+- chore(deps): bump golang.org/x/image from 0.17.0 to 0.18.0 by @dependabot in https://github.com/k1LoW/octocov/pull/382
+- chore(deps): bump the dependencies group across 1 directory with 7 updates by @dependabot in https://github.com/k1LoW/octocov/pull/386
+
+## [v0.60.0](https://github.com/k1LoW/octocov/compare/v0.59.3...v0.60.0) - 2024-05-24
+### Breaking Changes 🛠
+- All numbers are displayed rounded down to one decimal place. by @k1LoW in https://github.com/k1LoW/octocov/pull/371
+### Other Changes
+- chore(deps): bump the dependencies group with 2 updates by @dependabot in https://github.com/k1LoW/octocov/pull/363
+- chore(deps): bump the dependencies group with 4 updates by @dependabot in https://github.com/k1LoW/octocov/pull/365
+- Bump up go version by @k1LoW in https://github.com/k1LoW/octocov/pull/367
+- chore(deps): bump the dependencies group with 7 updates by @dependabot in https://github.com/k1LoW/octocov/pull/366
+- chore(deps): bump the dependencies group with 7 updates by @dependabot in https://github.com/k1LoW/octocov/pull/369
+
+## [v0.59.3](https://github.com/k1LoW/octocov/compare/v0.59.2...v0.59.3) - 2024-04-24
+
+## [v0.59.2](https://github.com/k1LoW/octocov/compare/v0.59.1...v0.59.2) - 2024-04-24
+### Fix bug 🐛
+- Fix typo by @sapuri in https://github.com/k1LoW/octocov/pull/361
+### Other Changes
+- chore(deps): bump the dependencies group with 6 updates by @dependabot in https://github.com/k1LoW/octocov/pull/356
+- chore(deps): bump github.com/expr-lang/expr from 1.16.3 to 1.16.4 in the dependencies group by @dependabot in https://github.com/k1LoW/octocov/pull/359
+- chore(deps): bump the dependencies group with 3 updates by @dependabot in https://github.com/k1LoW/octocov/pull/360
+
+## [v0.59.1](https://github.com/k1LoW/octocov/compare/v0.59.0...v0.59.1) - 2024-04-09
+### Other Changes
+- chore(deps): bump the dependencies group with 5 updates by @dependabot in https://github.com/k1LoW/octocov/pull/352
+- chore(deps): bump the dependencies group with 6 updates by @dependabot in https://github.com/k1LoW/octocov/pull/354
+- chore(deps): bump the dependencies group with 11 updates by @dependabot in https://github.com/k1LoW/octocov/pull/355
+- Update go version by @k1LoW in https://github.com/k1LoW/octocov/pull/357
+
+## [v0.59.0](https://github.com/k1LoW/octocov/compare/v0.58.1...v0.59.0) - 2024-03-11
+### Breaking Changes 🛠
+- Mitigate conditions for local coverage display. by @k1LoW in https://github.com/k1LoW/octocov/pull/351
+### Other Changes
+- chore(deps): bump the dependencies group with 3 updates by @dependabot in https://github.com/k1LoW/octocov/pull/346
+- Update go and pkg version by @k1LoW in https://github.com/k1LoW/octocov/pull/349
+- Migrate to AWS SDK Go V2 by @furusax0621 in https://github.com/k1LoW/octocov/pull/348
+- chore(deps): bump the dependencies group with 9 updates by @dependabot in https://github.com/k1LoW/octocov/pull/350
+
+## [v0.58.1](https://github.com/k1LoW/octocov/compare/v0.58.0...v0.58.1) - 2024-02-26
+### Fix bug 🐛
+- Fix typo by @furusax0621 in https://github.com/k1LoW/octocov/pull/345
+### Other Changes
+- chore(deps): bump the dependencies group with 1 update by @dependabot in https://github.com/k1LoW/octocov/pull/339
+- Update artifact-action by @k1LoW in https://github.com/k1LoW/octocov/pull/338
+- Fix dependabot schedule by @k1LoW in https://github.com/k1LoW/octocov/pull/341
+- chore(deps): bump the dependencies group with 1 update by @dependabot in https://github.com/k1LoW/octocov/pull/342
+- chore(deps): bump the dependencies group with 2 updates by @dependabot in https://github.com/k1LoW/octocov/pull/343
+- chore(deps): bump the dependencies group with 4 updates by @dependabot in https://github.com/k1LoW/octocov/pull/344
+
+## [v0.58.0](https://github.com/k1LoW/octocov/compare/v0.57.0...v0.58.0) - 2024-02-14
+### Breaking Changes 🛠
+- Fix statement type coverage calculation by @furusax0621 in https://github.com/k1LoW/octocov/pull/327
+### Other Changes
+- Enable dependabot and update Go version by @k1LoW in https://github.com/k1LoW/octocov/pull/326
+- chore(deps): bump docker/setup-qemu-action from 2 to 3 by @dependabot in https://github.com/k1LoW/octocov/pull/329
+- chore(deps): bump docker/login-action from 2 to 3 by @dependabot in https://github.com/k1LoW/octocov/pull/330
+- chore(deps): bump docker/setup-buildx-action from 2 to 3 by @dependabot in https://github.com/k1LoW/octocov/pull/331
+- chore(deps): bump actions/setup-go from 4 to 5 by @dependabot in https://github.com/k1LoW/octocov/pull/332
+- chore(deps): bump the dependencies group with 6 updates by @dependabot in https://github.com/k1LoW/octocov/pull/337
+- chore(deps): bump actions/checkout from 3 to 4 by @dependabot in https://github.com/k1LoW/octocov/pull/333
+- chore(deps): bump docker/build-push-action from 2 to 5 by @dependabot in https://github.com/k1LoW/octocov/pull/335
+
+## [v0.57.0](https://github.com/k1LoW/octocov/compare/v0.56.4...v0.57.0) - 2024-02-08
+### Breaking Changes 🛠
+- Support coverage.exclude: for excluding files from coverage reports by @k1LoW in https://github.com/k1LoW/octocov/pull/323
+### Other Changes
+- Fix CD pipeline by @k1LoW in https://github.com/k1LoW/octocov/pull/320
+- Update pkgs by @k1LoW in https://github.com/k1LoW/octocov/pull/324
+
+## [v0.56.4](https://github.com/k1LoW/octocov/compare/v0.56.3...v0.56.4) - 2024-01-25
+### Other Changes
+- Update gocloc by @k1LoW in https://github.com/k1LoW/octocov/pull/318
+
+## [v0.56.3](https://github.com/k1LoW/octocov/compare/v0.56.2...v0.56.3) - 2024-01-24
+### Fix bug 🐛
+- Fix path handling for Windows by @k1LoW in https://github.com/k1LoW/octocov/pull/315
+
+## [v0.56.2](https://github.com/k1LoW/octocov/compare/v0.56.1...v0.56.2) - 2024-01-23
+### New Features 🎉
+- Support Windows by @k1LoW in https://github.com/k1LoW/octocov/pull/313
+
+## [v0.56.1](https://github.com/k1LoW/octocov/compare/v0.56.0...v0.56.1) - 2024-01-22
+### Other Changes
+- Use github.com/chainguard-dev/git-urls v1.0.2 for fixing https://github.com/advisories/GHSA-3f2q-6294-fmq5 by @k1LoW in https://github.com/k1LoW/octocov/pull/311
+
+## [v0.56.0](https://github.com/k1LoW/octocov/compare/v0.55.2...v0.56.0) - 2024-01-22
+### New Features 🎉
+- Improving readability of benchmark scores by @k2tzumi in https://github.com/k1LoW/octocov/pull/308
+### Other Changes
+- Bump github.com/cloudflare/circl from 1.3.3 to 1.3.7 by @dependabot in https://github.com/k1LoW/octocov/pull/309
+
+## [v0.55.2](https://github.com/k1LoW/octocov/compare/v0.55.1...v0.55.2) - 2023-12-28
+### Other Changes
+- Bump github.com/go-git/go-git/v5 from 5.5.2 to 5.11.0 by @dependabot in https://github.com/k1LoW/octocov/pull/306
+
+## [v0.55.1](https://github.com/k1LoW/octocov/compare/v0.55.0...v0.55.1) - 2023-12-19
+### Other Changes
+- Bump golang.org/x/crypto from 0.14.0 to 0.17.0 by @dependabot in https://github.com/k1LoW/octocov/pull/304
+
+## [v0.55.0](https://github.com/k1LoW/octocov/compare/v0.54.6...v0.55.0) - 2023-11-29
+### Breaking Changes 🛠
+- mv pkg/* to ./ by @k1LoW in https://github.com/k1LoW/octocov/pull/303
+
+## [v0.54.6](https://github.com/k1LoW/octocov/compare/v0.54.5...v0.54.6) - 2023-11-03
+### Fix bug 🐛
+- Identify the region of the bucket by @k1LoW in https://github.com/k1LoW/octocov/pull/301
+### Other Changes
+- Bump golang.org/x/image from 0.5.0 to 0.10.0 by @dependabot in https://github.com/k1LoW/octocov/pull/299
+
+## [v0.54.5](https://github.com/k1LoW/octocov/compare/v0.54.4...v0.54.5) - 2023-10-26
+### Other Changes
+- Bump google.golang.org/grpc from 1.53.0 to 1.56.3 by @dependabot in https://github.com/k1LoW/octocov/pull/295
+
+## [v0.54.4](https://github.com/k1LoW/octocov/compare/v0.54.3...v0.54.4) - 2023-10-24
+### Fix bug 🐛
+- `octocov ls-files` and `octocov view` should run locally as much as possible. by @k1LoW in https://github.com/k1LoW/octocov/pull/293
+### Other Changes
+- Make clear the error message of if section by @k1LoW in https://github.com/k1LoW/octocov/pull/292
+
+## [v0.54.3](https://github.com/k1LoW/octocov/compare/v0.54.2...v0.54.3) - 2023-10-17
+### Other Changes
+- Swap table XY if custom metrics have many columns. by @k1LoW in https://github.com/k1LoW/octocov/pull/289
+
+## [v0.54.2](https://github.com/k1LoW/octocov/compare/v0.54.1...v0.54.2) - 2023-10-12
+### Other Changes
+- docs: add the installation guide with aqua by @suzuki-shunsuke in https://github.com/k1LoW/octocov/pull/286
+- Bump golang.org/x/net from 0.7.0 to 0.17.0 by @dependabot in https://github.com/k1LoW/octocov/pull/288
+
+## [v0.54.1](https://github.com/k1LoW/octocov/compare/v0.54.0...v0.54.1) - 2023-10-02
+### Fix bug 🐛
+- Fix report of custom metrics by @k1LoW in https://github.com/k1LoW/octocov/pull/284
+
+## [v0.54.0](https://github.com/k1LoW/octocov/compare/v0.53.0...v0.54.0) - 2023-09-30
+### Breaking Changes 🛠
+- Always override existing environment variables with the prefix `OCTOCOV_` by @k1LoW in https://github.com/k1LoW/octocov/pull/282
+### Fix bug 🐛
+- Delete/Minimize previous comments all by @k1LoW in https://github.com/k1LoW/octocov/pull/280
+
+## [v0.53.0](https://github.com/k1LoW/octocov/compare/v0.52.2...v0.53.0) - 2023-09-30
+### Breaking Changes 🛠
+- Update linter setting by @k1LoW in https://github.com/k1LoW/octocov/pull/277
+### New Features 🎉
+- Support `if:` section for three metrics by @k1LoW in https://github.com/k1LoW/octocov/pull/279
+### Other Changes
+- Remove title if three metrics are not mesured by @k1LoW in https://github.com/k1LoW/octocov/pull/278
+
+## [v0.52.2](https://github.com/k1LoW/octocov/compare/v0.52.1...v0.52.2) - 2023-09-29
+### Other Changes
+- Allow to merge no coverages reports by @k1LoW in https://github.com/k1LoW/octocov/pull/274
+
+## [v0.52.1](https://github.com/k1LoW/octocov/compare/v0.52.0...v0.52.1) - 2023-09-24
+### Other Changes
+- Update JSON schema for custom metrics by @k1LoW in https://github.com/k1LoW/octocov/pull/272
+
+## [v0.52.0](https://github.com/k1LoW/octocov/compare/v0.51.6...v0.52.0) - 2023-09-23
+### New Features 🎉
+- Support metadata for custom metrics by @k1LoW in https://github.com/k1LoW/octocov/pull/270
+
+## [v0.51.6](https://github.com/k1LoW/octocov/compare/v0.51.5...v0.51.6) - 2023-09-06
+### Fix bug 🐛
+- swap fileA and fileB results because it was reversed  by @rajyan in https://github.com/k1LoW/octocov/pull/268
+
+## [v0.51.5](https://github.com/k1LoW/octocov/compare/v0.51.4...v0.51.5) - 2023-09-06
+### Fix bug 🐛
+- Fix diff metrics table (panic: runtime error: invalid memory address or nil pointer dereference) by @k1LoW in https://github.com/k1LoW/octocov/pull/266
+
+## [v0.51.4](https://github.com/k1LoW/octocov/compare/v0.51.3...v0.51.4) - 2023-09-03
+### Other Changes
+- Enhance validation related to custom metrics (e.g., key uniqueness) by @k1LoW in https://github.com/k1LoW/octocov/pull/264
+
+## [v0.51.3](https://github.com/k1LoW/octocov/compare/v0.51.2...v0.51.3) - 2023-09-03
+### Breaking Changes 🛠
+- If the value of custom metric is determined to be an integer, the metric is displayed as an integer by @k1LoW in https://github.com/k1LoW/octocov/pull/261
+
+## [v0.51.2](https://github.com/k1LoW/octocov/compare/v0.51.1...v0.51.2) - 2023-09-03
+### New Features 🎉
+- Support for multiple custom metrics from one environment variable. by @k1LoW in https://github.com/k1LoW/octocov/pull/259
+### Other Changes
+- Update CREDITS by @k1LoW in https://github.com/k1LoW/octocov/pull/260
+
+## [v0.51.1](https://github.com/k1LoW/octocov/compare/v0.51.0...v0.51.1) - 2023-09-02
+### Other Changes
+- Add asset for linux arm64 by @k1LoW in https://github.com/k1LoW/octocov/pull/256
+
+## [v0.51.0](https://github.com/k1LoW/octocov/compare/v0.50.1...v0.51.0) - 2023-09-02
+### Breaking Changes 🛠
+- Show custom metrics reports in pull requests and summaries by @k1LoW in https://github.com/k1LoW/octocov/pull/249
+### New Features 🎉
+- Collect custom metrics by @k1LoW in https://github.com/k1LoW/octocov/pull/247
+- Show custom metrics reports in output of `octocov` by @k1LoW in https://github.com/k1LoW/octocov/pull/252
+- Add JSON Schema for custom metrics by @k1LoW in https://github.com/k1LoW/octocov/pull/254
+### Other Changes
+- Add to README about custom metrics. by @k1LoW in https://github.com/k1LoW/octocov/pull/255
+
+## [v0.50.1](https://github.com/k1LoW/octocov/compare/v0.50.0...v0.50.1) - 2023-08-22
+### Fix bug 🐛
+- Fix private central ( Use `?raw=true` URL ) by @k1LoW in https://github.com/k1LoW/octocov/pull/242
+
+## [v0.50.0](https://github.com/k1LoW/octocov/compare/v0.49.0...v0.50.0) - 2023-08-21
+### New Features 🎉
+- Only display badges if the central mode repository is private by @k1LoW in https://github.com/k1LoW/octocov/pull/241
+### Other Changes
+- Add govluncheck by @k1LoW in https://github.com/k1LoW/octocov/pull/239
+
+## [v0.49.0](https://github.com/k1LoW/octocov/compare/v0.48.0...v0.49.0) - 2023-07-19
+- Support `timeout:` and set default timeout by @k1LoW in https://github.com/k1LoW/octocov/pull/237
+- Update lint setting by @k1LoW in https://github.com/k1LoW/octocov/pull/238
+
+## [v0.48.0](https://github.com/k1LoW/octocov/compare/v0.47.4...v0.48.0) - 2023-07-12
+- Support `GITHUB_PULL_REQUEST_NUMBER` for detecting pull request number by @k1LoW in https://github.com/k1LoW/octocov/pull/233
+
+## [v0.47.4](https://github.com/k1LoW/octocov/compare/v0.47.3...v0.47.4) - 2023-06-23
+- Fix panic when adding codeToTestRatio for the first time by @rajyan in https://github.com/k1LoW/octocov/pull/231
+
+## [v0.47.3](https://github.com/k1LoW/octocov/compare/v0.47.2...v0.47.3) - 2023-05-30
+- Bump github.com/cloudflare/circl from 1.1.0 to 1.3.3 by @dependabot in https://github.com/k1LoW/octocov/pull/228
+
+## [v0.47.2](https://github.com/k1LoW/octocov/compare/v0.47.1...v0.47.2) - 2023-03-14
+- Fix DetectCurrentBranch by @k1LoW in https://github.com/k1LoW/octocov/pull/225
+
+## [v0.47.1](https://github.com/k1LoW/octocov/compare/v0.47.0...v0.47.1) - 2023-02-19
+- Fix CI by @k1LoW in https://github.com/k1LoW/octocov/pull/222
+
+## [v0.47.0](https://github.com/k1LoW/octocov/compare/v0.46.0...v0.47.0) - 2023-02-18
+- Update go and pkgs version by @k1LoW in https://github.com/k1LoW/octocov/pull/219
+- Bump golang.org/x/net from 0.6.0 to 0.7.0 by @dependabot in https://github.com/k1LoW/octocov/pull/221
+
+## [v0.46.0](https://github.com/k1LoW/octocov/compare/v0.45.3...v0.46.0) - 2022-11-11
+- test: add case for https://github.com/antonmedv/expr expression supports by @u-yas in https://github.com/k1LoW/octocov/pull/209
+- feat: customize commit message by octocov.yml by @u-yas in https://github.com/k1LoW/octocov/pull/215
+- bonsai by @k1LoW in https://github.com/k1LoW/octocov/pull/216
+
+## [v0.45.3](https://github.com/k1LoW/octocov/compare/v0.45.2...v0.45.3) - 2022-11-09
+- Fix build pipeline of docker image by @k1LoW in https://github.com/k1LoW/octocov/pull/212
+
+## [v0.45.2](https://github.com/k1LoW/octocov/compare/v0.45.1...v0.45.2) - 2022-11-09
+- Fix SA1019 by @k1LoW in https://github.com/k1LoW/octocov/pull/206
+- Add `badgen` command for generating SVG badge by @k1LoW in https://github.com/k1LoW/octocov/pull/210
+- Fix `badgen` by @k1LoW in https://github.com/k1LoW/octocov/pull/211
+
+## [v0.45.1](https://github.com/k1LoW/octocov/compare/v0.45.0...v0.45.1) - 2022-11-03
+- Fix config central.reReport: by @k1LoW in https://github.com/k1LoW/octocov/pull/204
+
+## [v0.45.0](https://github.com/k1LoW/octocov/compare/v0.44.1...v0.45.0) - 2022-11-03
+- Support `mackerel://` datastore by @k1LoW in https://github.com/k1LoW/octocov/pull/199
+- Add `central.reReport:` for re-reporting code metrics by @k1LoW in https://github.com/k1LoW/octocov/pull/201
+- Fix time unit of test execution time for Mackerel by @k1LoW in https://github.com/k1LoW/octocov/pull/202
+- Add doc about `central.reReport:` by @k1LoW in https://github.com/k1LoW/octocov/pull/203
+
+## [v0.44.1](https://github.com/k1LoW/octocov/compare/v0.44.0...v0.44.1) - 2022-10-19
+- Update README about `summary:` by @k1LoW in https://github.com/k1LoW/octocov/pull/194
+- Fix FuzzyFindByFile by @k1LoW in https://github.com/k1LoW/octocov/pull/198
+
+## [v0.44.0](https://github.com/k1LoW/octocov/compare/v0.43.2...v0.44.0) (2022-10-12)
+
+* Update pkgs [#189](https://github.com/k1LoW/octocov/pull/189) ([k1LoW](https://github.com/k1LoW))
+* Enable `summary:` by default in .octocov.yml generated by `octocov init` [#184](https://github.com/k1LoW/octocov/pull/184) ([k1LoW](https://github.com/k1LoW))
+* Fix CI [#183](https://github.com/k1LoW/octocov/pull/183) ([k1LoW](https://github.com/k1LoW))
+* Add CI status badge [#181](https://github.com/k1LoW/octocov/pull/181) ([toshi0607](https://github.com/toshi0607))
+
+## [v0.43.2](https://github.com/k1LoW/octocov/compare/v0.43.1...v0.43.2) - 2022-10-11
+- Add `*.hideFooterLink` by @k1LoW in https://github.com/k1LoW/octocov/pull/178
+- [BREAKING] Fix building Config.Coverage.Paths by @k1LoW in https://github.com/k1LoW/octocov/pull/180
+
+## [v0.43.1](https://github.com/k1LoW/octocov/compare/v0.43.0...v0.43.1) - 2022-10-10
+- Fix changelog by @k1LoW in https://github.com/k1LoW/octocov/pull/175
+- Should always be able to report to GitHub Actions Job Summaries by @k1LoW in https://github.com/k1LoW/octocov/pull/177
+
+## [v0.43.0](https://github.com/k1LoW/octocov/compare/v0.42.1...v0.43.0) - 2022-10-08
+- Use tagpr by @k1LoW in https://github.com/k1LoW/octocov/pull/173
+- Support for inserting code metrics report to body of pull request by @k1LoW in https://github.com/k1LoW/octocov/pull/172
+
+## [v0.42.1](https://github.com/k1LoW/octocov/compare/v0.42.0...v0.42.1) (2022-09-28)
+
+* When only summary is used, the comment setting is nil [#171](https://github.com/k1LoW/octocov/pull/171) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.42.0](https://github.com/k1LoW/octocov/compare/v0.41.1...v0.42.0) (2022-09-18)
+
+* Add variable `labels` [#170](https://github.com/k1LoW/octocov/pull/170) ([k1LoW](https://github.com/k1LoW))
+* Add variable `is_draft` [#169](https://github.com/k1LoW/octocov/pull/169) ([k1LoW](https://github.com/k1LoW))
+* Support for adding code metrics report to GitHub Actions Job Summaries [#168](https://github.com/k1LoW/octocov/pull/168) ([k1LoW](https://github.com/k1LoW))
+* Allow `artifacts://` scheme [#167](https://github.com/k1LoW/octocov/pull/167) ([k1LoW](https://github.com/k1LoW))
+* Use badges of https://github.com/k1LoW/octocovs [#166](https://github.com/k1LoW/octocov/pull/166) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.41.1](https://github.com/k1LoW/octocov/compare/v0.41.0...v0.41.1) (2022-09-01)
+
+* Fix build flags in build for linux [#165](https://github.com/k1LoW/octocov/pull/165) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.41.0](https://github.com/k1LoW/octocov/compare/v0.40.1...v0.41.0) (2022-09-01)
+
+* Fix build pipeline [#163](https://github.com/k1LoW/octocov/pull/163) ([k1LoW](https://github.com/k1LoW))
+* Support collect artifacts on central mode [#162](https://github.com/k1LoW/octocov/pull/162) ([k1LoW](https://github.com/k1LoW))
+* [BREAKING] Update pkgs [#160](https://github.com/k1LoW/octocov/pull/160) ([k1LoW](https://github.com/k1LoW))
+* Bump up github.com/google/go-github version [#159](https://github.com/k1LoW/octocov/pull/159) ([k1LoW](https://github.com/k1LoW))
+* Bump up go version [#158](https://github.com/k1LoW/octocov/pull/158) ([k1LoW](https://github.com/k1LoW))
+* Git.io deprecation [#156](https://github.com/k1LoW/octocov/pull/156) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.40.1](https://github.com/k1LoW/octocov/compare/v0.40.0...v0.40.1) (2022-04-18)
+
+* Fix artifact name [#155](https://github.com/k1LoW/octocov/pull/155) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.40.0](https://github.com/k1LoW/octocov/compare/v0.39.2...v0.40.0) (2022-04-17)
+
+* Fix the name of storing report data in the Artifact in the case of changing the `repository:` section. [#154](https://github.com/k1LoW/octocov/pull/154) ([k1LoW](https://github.com/k1LoW))
+* Separate comment for each repository name [#153](https://github.com/k1LoW/octocov/pull/153) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.39.2](https://github.com/k1LoW/octocov/compare/v0.39.1...v0.39.2) (2022-04-11)
+
+* Fix handling of branch with slash in name [#151](https://github.com/k1LoW/octocov/pull/151) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.39.1](https://github.com/k1LoW/octocov/compare/v0.39.0...v0.39.1) (2022-04-03)
+
+* Fix FuzzyFindByFile [#150](https://github.com/k1LoW/octocov/pull/150) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.39.0](https://github.com/k1LoW/octocov/compare/v0.38.2...v0.39.0) (2022-04-03)
+
+* Support JaCoCo format [#149](https://github.com/k1LoW/octocov/pull/149) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.38.2](https://github.com/k1LoW/octocov/compare/v0.38.1...v0.38.2) (2022-03-16)
+
+* Revert build environment [#147](https://github.com/k1LoW/octocov/pull/147) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.38.2](https://github.com/k1LoW/octocov/compare/v0.38.1...v0.38.2) (2022-03-16)
+
+* Revert build environment [#147](https://github.com/k1LoW/octocov/pull/147) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.38.1](https://github.com/k1LoW/octocov/compare/v0.38.0...v0.38.1) (2022-03-13)
+
+* When detecting prefix, only files under the working directory are targeted. [#145](https://github.com/k1LoW/octocov/pull/145) ([k1LoW](https://github.com/k1LoW))
+* Fix: panic when targeting a file with no coverage data. [#144](https://github.com/k1LoW/octocov/pull/144) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.38.0](https://github.com/k1LoW/octocov/compare/v0.37.1...v0.38.0) (2022-02-19)
+
+* [BREAKING] Remove all `enable:` section [#143](https://github.com/k1LoW/octocov/pull/143) ([k1LoW](https://github.com/k1LoW))
+* When merging coverage reports, if any one of them is not a TypeLOC, it should be TypeMerged. [#142](https://github.com/k1LoW/octocov/pull/142) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.37.1](https://github.com/k1LoW/octocov/compare/v0.37.0...v0.37.1) (2022-02-11)
+
+* [BREAKING] Revert "coverage.Gocover return LOC coverage (not statement count)" [#141](https://github.com/k1LoW/octocov/pull/141) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.37.0](https://github.com/k1LoW/octocov/compare/v0.36.0...v0.37.0) (2022-02-11)
+
+* [BREAKING] coverage.Gocover return LOC coverage (not statement count) [#140](https://github.com/k1LoW/octocov/pull/140) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.36.0](https://github.com/k1LoW/octocov/compare/v0.35.0...v0.36.0) (2022-02-10)
+
+* Add `octocov init` for generating .octocov.yml [#139](https://github.com/k1LoW/octocov/pull/139) ([k1LoW](https://github.com/k1LoW))
+* Not shrinking report data in some datastores [#138](https://github.com/k1LoW/octocov/pull/138) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.35.0](https://github.com/k1LoW/octocov/compare/v0.34.0...v0.35.0) (2022-02-07)
+
+* Support datastore.artifact [#137](https://github.com/k1LoW/octocov/pull/137) ([k1LoW](https://github.com/k1LoW))
+* Add log [#136](https://github.com/k1LoW/octocov/pull/136) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.34.0](https://github.com/k1LoW/octocov/compare/v0.33.3...v0.34.0) (2022-02-03)
+
+* [BREAKING] Minimize previous coverage report comments instead of deleting them [#135](https://github.com/k1LoW/octocov/pull/135) ([k1LoW](https://github.com/k1LoW))
+* Add test for pkg/badge [#134](https://github.com/k1LoW/octocov/pull/134) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.33.3](https://github.com/k1LoW/octocov/compare/v0.33.2...v0.33.3) (2022-01-21)
+
+* Fix the counting non codes [#133](https://github.com/k1LoW/octocov/pull/133) ([k1LoW](https://github.com/k1LoW))
+* Fix the counting of metrics when merging. [#132](https://github.com/k1LoW/octocov/pull/132) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.33.2](https://github.com/k1LoW/octocov/compare/v0.33.1...v0.33.2) (2022-01-21)
+
+* Fix SimpleCov parser [#131](https://github.com/k1LoW/octocov/pull/131) ([k1LoW](https://github.com/k1LoW))
+
+## [v0.33.1](https://github.com/k1LoW/octocov/compare/v0.33.0...v0.33.1) (2022-01-16)
+
+* Fix parallel test [#130](https://github.com/k1LoW/octocov/pull/130) ([k1LoW](https://github.com/k1LoW))
+
 ## [v0.33.0](https://github.com/k1LoW/octocov/compare/v0.32.0...v0.33.0) (2022-01-15)
 
 * Replace io/ioutil [#129](https://github.com/k1LoW/octocov/pull/129) ([k1LoW](https://github.com/k1LoW))
@@ -297,4 +731,3 @@
 * Fix `octocov completion` interface [#1](https://github.com/k1LoW/octocov/pull/1) ([k1LoW](https://github.com/k1LoW))
 
 ## [v0.1.0](https://github.com/k1LoW/octocov/compare/88314da64080...v0.1.0) (2021-05-04)
-

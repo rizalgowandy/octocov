@@ -1,7 +1,22 @@
+repository: k1LoW/octocov/parallel
 coverage:
-  path: coverage.out
+  acceptable: current >= 40%
+  paths:
+    - ../coverage_coverage.out
+    - ../coverage_ratio.out
+    - ../coverage_badge.out
+    - ../coverage_other.out
 testExecutionTime:
   steps:
-    - Run tests 0
-    - Run tests 1
-    - Run tests 2
+    - Run tests coverage
+    - Run tests ratio
+    - Run tests badge
+    - Run tests other
+comment:
+  if: false
+report:
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
+diff:
+  datastores:
+    - artifact://${GITHUB_REPOSITORY}
